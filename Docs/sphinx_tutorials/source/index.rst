@@ -36,10 +36,7 @@ The amrex/Tutorials directory is broken into the following categories:
    Particles_Tutorial
    SDC_Tutorial
    SENSEI_Tutorial
-<<<<<<< HEAD
-=======
    SUNDIALS_Tutorial
->>>>>>> backup/sundials5
    SWFFT_Tutorial
 
 Indices and tables
