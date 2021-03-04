@@ -166,3 +166,8 @@ if(WIN32 AND BUILD_SHARED_LIBS)
   add_amrex_define(AMREX_IS_DLL NO_LEGACY)
   target_compile_definitions( amrex PRIVATE AMREX_IS_DLL_BUILDING)
 endif()
+
+#
+# SUNDIALS
+#
+add_amrex_define(AMREX_USE_SUNDIALS IF AMReX_SUNDIALS)
