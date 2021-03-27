@@ -43,7 +43,7 @@ int main (int argc, char* argv[])
 	BL_PROFILE_VAR_STOP(max1);
 	  BL_PROFILE_VAR("CPU-max-2",max2);
 	check_remote = m_threadsafe_rcv = remotetouch.max<RunOn::Host>() <= 1;
-	BL_PROFILE_VAR_STOP(max1);
+	BL_PROFILE_VAR_STOP(max2);
 	amrex::Print()<<"Found these max values: "<<check_local<<"\t"<<check_remote<<std::endl;
     }
     amrex::Finalize();
