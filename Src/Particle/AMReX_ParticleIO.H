@@ -640,6 +640,7 @@ ParticleContainer<NStructReal, NStructInt, NArrayReal, NArrayInt, Allocator>
     const auto strttime = amrex::second();
 
     int DATA_Digits_Read(5);
+    
     ParmParse pp("particles");
     pp.query("datadigits_read",DATA_Digits_Read);
 
@@ -673,6 +674,10 @@ ParticleContainer<NStructReal, NStructInt, NArrayReal, NArrayInt, Allocator>
     }
     else if (version.find("Version_One_Dot_One")  != std::string::npos ||
              version.find("Version_Two_Dot_Zero") != std::string::npos) {
+      /*        if (version.find("Version_One_Dot_One")  != std::string::npos) {
+          DATA_Digits_Read = 4;
+          pp.query("datadigits_read",DATA_Digits_Read);
+          }*/
         if (version.find("_single") != std::string::npos) {
             how = "single";
         }
@@ -701,6 +706,7 @@ ParticleContainer<NStructReal, NStructInt, NArrayReal, NArrayInt, Allocator>
     if (nr != NStructReal + NumRealComps())
         amrex::Abort("ParticleContainer::Restart(): nr != NStructReal + NumRealComps()");
 
+    if(version.find("Version_Two_Dot_Zero") != std::string::npos) {
     std::string comp_name;
     for (int i = 0; i < nr; ++i)
         HdrFile >> comp_name;
@@ -715,6 +721,7 @@ ParticleContainer<NStructReal, NStructInt, NArrayReal, NArrayInt, Allocator>
 
     bool checkpoint;
     HdrFile >> checkpoint;
+    }
 
     Long nparticles;
     HdrFile >> nparticles;
@@ -880,6 +887,11 @@ ParticleContainer<NStructReal, NStructInt, NArrayReal, NArrayInt, Allocator>
 
             if (!ParticleFile.good())
                 amrex::Abort("ParticleContainer::Restart(): problem reading particles");
+            /*
+            amrex::Print()<<"Valid read particles: "<<TotalNumberOfParticles(true, false)<<std::endl;
+            amrex::Print()<<"  All read particles: "<<TotalNumberOfParticles(false, false)<<std::endl;
+            amrex::Print()<<"IOloc read particles: "<<TotalNumberOfParticles(false, true)<<std::endl;
+            Redistribute();*/
         }
     }
 
@@ -909,12 +921,15 @@ ParticleContainer<NStructReal, NStructInt, NArrayReal, NArrayInt, Allocator>
     // First read in the integer data in binary.  We do not store
     // the m_lev and m_grid data on disk.  We can easily recreate
     // that given the structure of the checkpoint file.
-    const int iChunkSize = 2 + NStructInt + NumIntComps();
+    //    const int iChunkSize = version.find("Version_Two_Dot_Zero") != std::string::npos ? 2 + NStructInt + NumIntComps() : AMREX_SPACEDIM + 2 + NStructInt + NumIntComps();
+    const int iChunkSize = AMREX_SPACEDIM + 2 + NStructInt + NumIntComps();
+    AMREX_ALWAYS_ASSERT(iChunkSize==5);
     Vector<int> istuff(cnt*iChunkSize);
-    readIntData(istuff.dataPtr(), istuff.size(), ifs, FPC::NativeIntDescriptor());
+    //    readIntData(istuff.dataPtr(), istuff.size(), ifs, FPC::NativeIntDescriptor());
 
     // Then the real data in binary.
     const int rChunkSize = AMREX_SPACEDIM + NStructReal + NumRealComps();
+    AMREX_ALWAYS_ASSERT(rChunkSize==7);
     Vector<RTYPE> rstuff(cnt*rChunkSize);
     ReadParticleRealData(rstuff.dataPtr(), rstuff.size(), ifs);
 
@@ -940,18 +955,19 @@ ParticleContainer<NStructReal, NStructInt, NArrayReal, NArrayInt, Allocator>
     host_int_attribs.resize(finest_level_in_file+1);
 
     for (int i = 0; i < cnt; i++) {
+      /*
         p.id()   = iptr[0];
         p.cpu()  = iptr[1];
 
         iptr += 2;
+        iptr += AMREX_SPACEDIM;
 
         for (int j = 0; j < NStructInt; j++)
         {
             p.idata(j) = *iptr;
             ++iptr;
         }
-
-        AMREX_ASSERT(p.id() > 0);
+      */
 
         AMREX_D_TERM(p.pos(0) = ParticleReal(rptr[0]);,
                      p.pos(1) = ParticleReal(rptr[1]);,
@@ -966,6 +982,11 @@ ParticleContainer<NStructReal, NStructInt, NArrayReal, NArrayInt, Allocator>
         }
 
         locateParticle(p, pld, 0, finestLevel(), 0);
+
+        p.id()   = ParticleType::NextID();
+        p.cpu()  = ParallelDescriptor::MyProc();
+        
+        AMREX_ASSERT(p.id() > 0);
 
         std::pair<int, int> ind(grd, pld.m_tile);
 
