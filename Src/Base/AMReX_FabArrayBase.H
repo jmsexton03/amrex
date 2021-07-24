@@ -296,6 +296,15 @@ public:
     //! The maximum number of components to copy() at a time.
     static AMREX_EXPORT int MaxComp;
 
+    //! Output CPC into files
+    static AMREX_EXPORT bool CPCVerbose;
+
+    //! Output CPCs into this directory
+    static AMREX_EXPORT std::string CPCDirName;
+
+    //! CPC ID
+    static AMREX_EXPORT int CPCid;
+
     //! Initialize from ParmParse with "fabarray" prefix.
     static void Initialize ();
     static void Finalize ();
@@ -551,6 +560,7 @@ public:
         BoxArray    m_dstba;
         //
         Long        m_nuse;
+        int         m_id;
 
     private:
         void define (const BoxArray& ba_dst, const DistributionMapping& dm_dst,

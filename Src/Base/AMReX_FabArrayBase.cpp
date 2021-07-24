@@ -30,6 +30,9 @@ namespace amrex {
 // Set default values in Initialize()!!!
 //
 int     FabArrayBase::MaxComp;
+bool    FabArrayBase::CPCVerbose;
+std::string FabArrayBase::CPCDirName;
+int     FabArrayBase::CPCid;
 
 #if defined(AMREX_USE_GPU)
 
@@ -101,6 +104,9 @@ FabArrayBase::Initialize ()
     // Set default values here!!!
     //
     FabArrayBase::MaxComp           = 25;
+    FabArrayBase::CPCVerbose        = false;
+    FabArrayBase::CPCDirName        = "CPCs";
+    FabArrayBaes::CPCid             = 1;
 
     ParmParse pp("fabarray");
 
@@ -117,6 +123,12 @@ FabArrayBase::Initialize ()
     }
 
     pp.query("maxcomp",             FabArrayBase::MaxComp);
+    pp.query("cpc_verbose",         FabArrayBase::CPCVerbose);
+    pp.query("cpc_dirname",         FabArrayBase::CPCDirName);
+
+    if (CPCVerbose) {
+        amrex::UtilCreateDirectoryDestructive(CPCDirName);
+    }
 
     if (MaxComp < 1) {
         MaxComp = 1;
@@ -328,7 +340,34 @@ FabArrayBase::CPC::CPC (const BoxArray& dstba, const DistributionMapping& dstdm,
 }
 
 FabArrayBase::CPC::~CPC ()
-{}
+{
+    if (CPCVerbose)
+    {
+        amrex::Print() << " Writing CPC" << std::endl;
+
+        AllPrintToFile file(CPCDirName + "/CPC" + std::to_string(m_id));
+
+        // Number of uses
+        file << m_nuse << std::endl;
+
+        // Locals
+        for (const auto& tag : *m_LocTags)
+        {
+            file << tag.srcIndex << " " << tag.sbox << " -> "
+                 << tag.dstIndex << " " << tag.dbox << std::endl;
+        }
+
+        // Sends -- (No recvs. Removes duplicate comms).
+        for (auto const& dst: *m_SndTags)
+        {
+            for (auto const& tag: dst.second)
+            {
+                 file << tag.srcIndex << " " << tag.sbox << " -> "
+                      << dst.first << " " << tag.dbox << std::endl;
+            }
+        }
+    }
+}
 
 void
 FabArrayBase::CPC::define (const BoxArray& ba_dst, const DistributionMapping& dm_dst,
@@ -341,6 +380,8 @@ FabArrayBase::CPC::define (const BoxArray& ba_dst, const DistributionMapping& dm
 
     BL_ASSERT(ba_dst.size() > 0 && ba_src.size() > 0);
     BL_ASSERT(ba_dst.ixType() == ba_src.ixType());
+
+    m_id = CPCid++;
 
     m_LocTags = std::make_unique<CopyComTag::CopyComTagsContainer>();
     m_SndTags = std::make_unique<CopyComTag::MapOfCopyComTagContainers>();
