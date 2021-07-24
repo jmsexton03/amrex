@@ -106,7 +106,7 @@ FabArrayBase::Initialize ()
     FabArrayBase::MaxComp           = 25;
     FabArrayBase::CPCVerbose        = false;
     FabArrayBase::CPCDirName        = "CPCs";
-    FabArrayBaes::CPCid             = 1;
+    FabArrayBase::CPCid             = 1;
 
     ParmParse pp("fabarray");
 
