@@ -549,7 +549,7 @@ FabArray<FAB>::ParallelCopy_finish ()
         bool is_thread_safe = thecpc->m_threadsafe_rcv;
 
         {
-            BL_PROFILE("FabArray::ParallelCopy -- Waitall unpack");
+            BL_PROFILE("FabArray::ParallelCopy -- recvs unpack");
 #ifdef AMREX_USE_GPU
             if (Gpu::inLaunchRegion())
             {
