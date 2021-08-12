@@ -71,7 +71,7 @@ FabArray<FAB>::FBEP_nowait (int scomp, int ncomp, const IntVect& nghost,
     }
 
     BL_PROFILE_VAR_STOP(fb_early);
-    BL_PROFILE_VAR_START("FabArray::FillBoundary_other", fb_other);
+    BL_PROFILE_VAR("FabArray::FillBoundary_other", fb_other);
 
     fbd = std::make_unique<FBData<FAB>>();
     fbd->fb    = &TheFB;
