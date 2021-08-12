@@ -11,6 +11,8 @@ FabArray<FAB>::FBEP_nowait (int scomp, int ncomp, const IntVect& nghost,
 {
     AMREX_ASSERT_WITH_MESSAGE(!fbd, "FillBoundary_nowait() called when comm operation already in progress.");
 
+    BL_PROFILE_VAR("FabArray::FillBoundary_early", fb_early);
+
     bool work_to_do;
     if (enforce_periodicity_only) {
         work_to_do = period.isAnyPeriodic();
@@ -68,6 +70,9 @@ FabArray<FAB>::FBEP_nowait (int scomp, int ncomp, const IntVect& nghost,
         return;
     }
 
+    BL_PROFILE_VAR_STOP(fb_early);
+    BL_PROFILE_VAR_START("FabArray::FillBoundary_other", fb_other);
+
     fbd = std::make_unique<FBData<FAB>>();
     fbd->fb    = &TheFB;
     fbd->scomp = scomp;
@@ -78,62 +83,15 @@ FabArray<FAB>::FBEP_nowait (int scomp, int ncomp, const IntVect& nghost,
     fbd->epo   = enforce_periodicity_only;
     fbd->tag   = SeqNum;
 
-    //
-    // Post rcvs. Allocate one chunk of space to hold'm all.
-    //
-
-    if (N_rcvs > 0) {
-        PostRcvs(*TheFB.m_RcvTags, fbd->the_recv_data,
-                 fbd->recv_data, fbd->recv_size, fbd->recv_from, fbd->recv_reqs,
-                 ncomp, SeqNum);
-        fbd->recv_stat.resize(N_rcvs);
-    }
-
-    //
-    // Post send's
-    //
-    char*&                          the_send_data = fbd->the_send_data;
-    Vector<char*> &                     send_data = fbd->send_data;
-    Vector<std::size_t>                 send_size;
-    Vector<int>                         send_rank;
-    Vector<MPI_Request>&                send_reqs = fbd->send_reqs;
-    Vector<const CopyComTagsContainer*> send_cctc;
-
-    if (N_snds > 0)
-    {
-        PrepareSendBuffers(*TheFB.m_SndTags, the_send_data, send_data, send_size, send_rank,
-                           send_reqs, send_cctc, ncomp);
-
-#ifdef AMREX_USE_GPU
-        if (Gpu::inLaunchRegion())
-        {
-#if ( defined(__CUDACC__) && (__CUDACC_VER_MAJOR__ >= 10))
-            if (Gpu::inGraphRegion()) {
-                FB_pack_send_buffer_cuda_graph(TheFB, scomp, ncomp, send_data, send_size, send_cctc);
-            }
-            else
-#endif
-            {
-                pack_send_buffer_gpu(*this, scomp, ncomp, send_data, send_size, send_cctc);
-            }
-        }
-        else
-#endif
-        {
-            pack_send_buffer_cpu(*this, scomp, ncomp, send_data, send_size, send_cctc);
-        }
-
-        AMREX_ASSERT(send_reqs.size() == N_snds);
-        PostSnds(send_data, send_size, send_rank, send_reqs, SeqNum);
-    }
-
-    FillBoundary_test();
+    BL_PROFILE_VAR_STOP(fb_other);
 
     //
     // Do the local work.  Hope for a bit of communication/computation overlap.
     //
     if (N_locs > 0)
     {
+        BL_PROFILE("FabArray::FillBoundary -- Local");
+
 #ifdef AMREX_USE_GPU
         if (Gpu::inLaunchRegion())
         {
@@ -152,9 +110,76 @@ FabArray<FAB>::FBEP_nowait (int scomp, int ncomp, const IntVect& nghost,
         {
             FB_local_copy_cpu(TheFB, scomp, ncomp);
         }
-
-        FillBoundary_test();
     }
+
+    //
+    // Post rcvs. Allocate one chunk of space to hold'm all.
+    //
+
+    if (N_rcvs > 0) {
+        BL_PROFILE("FabArray::FillBoundary -- PostRecvs");
+
+        PostRcvs(*TheFB.m_RcvTags, fbd->the_recv_data,
+                 fbd->recv_data, fbd->recv_size, fbd->recv_from, fbd->recv_reqs,
+                 ncomp, SeqNum);
+        fbd->recv_stat.resize(N_rcvs);
+    }
+
+    BL_PROFILE_VAR_START(fb_other);
+
+    //
+    // Post send's
+    //
+    char*&                          the_send_data = fbd->the_send_data;
+    Vector<char*> &                     send_data = fbd->send_data;
+    Vector<std::size_t>                 send_size;
+    Vector<int>                         send_rank;
+    Vector<MPI_Request>&                send_reqs = fbd->send_reqs;
+    Vector<const CopyComTagsContainer*> send_cctc;
+
+    BL_PROFILE_VAR_STOP(fb_other);
+
+    if (N_snds > 0)
+    {
+        {
+            BL_PROFILE("FabArray::FillBoundary -- PrepareSends");
+
+            PrepareSendBuffers(*TheFB.m_SndTags, the_send_data, send_data, send_size, send_rank,
+                               send_reqs, send_cctc, ncomp);
+        }
+
+        {
+            BL_PROFILE("FabArray::FillBoundary -- PackSendBuffer");
+
+#ifdef AMREX_USE_GPU
+            if (Gpu::inLaunchRegion())
+            {
+#if ( defined(__CUDACC__) && (__CUDACC_VER_MAJOR__ >= 10))
+                if (Gpu::inGraphRegion()) {
+                    FB_pack_send_buffer_cuda_graph(TheFB, scomp, ncomp, send_data, send_size, send_cctc);
+                }
+                else
+#endif
+                {
+                    pack_send_buffer_gpu(*this, scomp, ncomp, send_data, send_size, send_cctc);
+                }
+            }
+            else
+#endif
+            {
+                pack_send_buffer_cpu(*this, scomp, ncomp, send_data, send_size, send_cctc);
+            }
+        }
+
+        {
+            BL_PROFILE("FabArray::FillBoundary -- PostSnds");
+
+            AMREX_ASSERT(send_reqs.size() == N_snds);
+            PostSnds(send_data, send_size, send_rank, send_reqs, SeqNum);
+        }
+    }
+
+    FillBoundary_test();
 
 #endif /*BL_USE_MPI*/
 }
@@ -174,6 +199,22 @@ FabArray<FAB>::FillBoundary_finish ()
     const int N_rcvs = TheFB->m_RcvTags->size();
     if (N_rcvs > 0)
     {
+        int actual_n_rcvs = N_rcvs - std::count(fbd->recv_data.begin(), fbd->recv_data.end(), nullptr);
+
+        if (actual_n_rcvs > 0) {
+            BL_PROFILE("FabArray::FillBoundary -- Waitall Recvs");
+
+            ParallelDescriptor::Waitall(fbd->recv_reqs, fbd->recv_stat);
+#ifdef AMREX_DEBUG
+            if (!CheckRcvStats(fbd->recv_stat, fbd->recv_size, fbd->tag))
+            {
+                amrex::Abort("FillBoundary_finish failed with wrong message size");
+            }
+#endif
+        }
+
+        BL_PROFILE_VAR("FabArray::FillBoundary_other", fb_other);
+
         Vector<const CopyComTagsContainer*> recv_cctc(N_rcvs,nullptr);
         for (int k = 0; k < N_rcvs; k++)
         {
@@ -184,46 +225,41 @@ FabArray<FAB>::FillBoundary_finish ()
             }
         }
 
-        int actual_n_rcvs = N_rcvs - std::count(fbd->recv_data.begin(), fbd->recv_data.end(), nullptr);
-
-        if (actual_n_rcvs > 0) {
-            ParallelDescriptor::Waitall(fbd->recv_reqs, fbd->recv_stat);
-#ifdef AMREX_DEBUG
-            if (!CheckRcvStats(fbd->recv_stat, fbd->recv_size, fbd->tag))
-            {
-                amrex::Abort("FillBoundary_finish failed with wrong message size");
-            }
-#endif
-        }
+        BL_PROFILE_VAR_STOP(fb_other);
 
         bool is_thread_safe = TheFB->m_threadsafe_rcv;
 
-#ifdef AMREX_USE_GPU
-        if (Gpu::inLaunchRegion())
         {
-#if ( defined(__CUDACC__) && (__CUDACC_VER_MAJOR__ >= 10) )
-            if (Gpu::inGraphRegion())
+            BL_PROFILE("FabArray::FillBoundary -- recvs unpack");
+#ifdef AMREX_USE_GPU
+            if (Gpu::inLaunchRegion())
             {
-                FB_unpack_recv_buffer_cuda_graph(*TheFB, fbd->scomp, fbd->ncomp,
-                                                 fbd->recv_data, fbd->recv_size,
-                                                 recv_cctc, is_thread_safe);
+#if ( defined(__CUDACC__) && (__CUDACC_VER_MAJOR__ >= 10) )
+                if (Gpu::inGraphRegion())
+                {
+                    FB_unpack_recv_buffer_cuda_graph(*TheFB, fbd->scomp, fbd->ncomp,
+                                                     fbd->recv_data, fbd->recv_size,
+                                                     recv_cctc, is_thread_safe);
+                }
+                else
+#endif
+                {
+                    unpack_recv_buffer_gpu(*this, fbd->scomp, fbd->ncomp, fbd->recv_data, fbd->recv_size,
+                                           recv_cctc, FabArrayBase::COPY, is_thread_safe);
+                }
             }
             else
 #endif
             {
-                unpack_recv_buffer_gpu(*this, fbd->scomp, fbd->ncomp, fbd->recv_data, fbd->recv_size,
+                unpack_recv_buffer_cpu(*this, fbd->scomp, fbd->ncomp, fbd->recv_data, fbd->recv_size,
                                        recv_cctc, FabArrayBase::COPY, is_thread_safe);
             }
-        }
-        else
-#endif
-        {
-            unpack_recv_buffer_cpu(*this, fbd->scomp, fbd->ncomp, fbd->recv_data, fbd->recv_size,
-                                   recv_cctc, FabArrayBase::COPY, is_thread_safe);
         }
 
         if (fbd->the_recv_data)
         {
+            BL_PROFILE("FabArray::FillBoundary -- free recvs");
+
             amrex::The_FA_Arena()->free(fbd->the_recv_data);
             fbd->the_recv_data = nullptr;
         }
@@ -231,10 +267,18 @@ FabArray<FAB>::FillBoundary_finish ()
 
     const int N_snds = TheFB->m_SndTags->size();
     if (N_snds > 0) {
-        Vector<MPI_Status> stats(fbd->send_reqs.size());
-        ParallelDescriptor::Waitall(fbd->send_reqs, stats);
-        amrex::The_FA_Arena()->free(fbd->the_send_data);
-        fbd->the_send_data = nullptr;
+        {
+            BL_PROFILE("FabArray::FillBoundary -- Waitall Sends");
+
+            Vector<MPI_Status> stats(fbd->send_reqs.size());
+            ParallelDescriptor::Waitall(fbd->send_reqs, stats);
+        }
+        {
+            BL_PROFILE("FabArray::FillBoundary -- Free Sends");
+
+            amrex::The_FA_Arena()->free(fbd->the_send_data);
+            fbd->the_send_data = nullptr;
+        }
     }
 
     fbd.reset();
