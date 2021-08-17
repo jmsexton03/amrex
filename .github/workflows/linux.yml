@@ -193,7 +193,7 @@ jobs:
             -DCMAKE_Fortran_COMPILER=$(which gfortran)
         make -j 2
 
-        ctest --output-on-failure -E GhostsAndVirtuals
+        ctest --output-on-failure
 
   # Build libamrex and all tests w/o MPI
   tests-nonmpi:
