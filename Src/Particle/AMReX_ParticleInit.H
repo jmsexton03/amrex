@@ -1267,17 +1267,27 @@ ParticleContainer<NStructReal, NStructInt, NArrayReal, NArrayInt, Allocator>
     {
         Box grid = m_gdb->ParticleBoxArray(0)[mfi.index()];
         RealBox grid_box = RealBox(grid,dx,geom.ProbLo());
+        ParticleReal x,y,z;
+        const Real* xlo = geom.ProbLo();
+        const Real* xhi = geom.ProbHi();
 
         for (Long icnt = 0; icnt < icount_per_box; icnt++) {
         for (Long jcnt = 0; jcnt < icount_per_box; jcnt++) {
         for (Long kcnt = 0; kcnt < icount_per_box; kcnt++)
         {
-            p.pos(0) = static_cast<ParticleReal>(grid_box.lo(0) + (dist(mt) + icnt) / icount_per_box * grid_box.length(0));
-            p.pos(1) = static_cast<ParticleReal>(grid_box.lo(1) + (dist(mt) + jcnt) / icount_per_box * grid_box.length(1));
-            p.pos(2) = static_cast<ParticleReal>(grid_box.lo(2) + (dist(mt) + kcnt) / icount_per_box * grid_box.length(2));
+            bool out_of_bounds = false;
+            do
+            {
+                p.pos(0) = static_cast<ParticleReal>(grid_box.lo(0) + (dist(mt) + icnt) / icount_per_box * grid_box.length(0));
+                p.pos(1) = static_cast<ParticleReal>(grid_box.lo(1) + (dist(mt) + jcnt) / icount_per_box * grid_box.length(1));
+                p.pos(2) = static_cast<ParticleReal>(grid_box.lo(2) + (dist(mt) + kcnt) / icount_per_box * grid_box.length(2));
+                for(int i=0; i < AMREX_SPACEDIM; i++)
+                    out_of_bounds = out_of_bounds || static_cast<ParticleReal>(p.pos(i)) < static_cast<ParticleReal>(xlo[i]) || static_cast<ParticleReal>(p.pos(i)) >= static_cast<ParticleReal>(xhi[i]) || static_cast<ParticleReal>(p.pos(i)) >= static_cast<ParticleReal>(grid_box.hi(i)) || static_cast<ParticleReal>(p.pos(i)) < static_cast<ParticleReal>(grid_box.lo(i));
+            }
+            while (out_of_bounds);
 
-            for (int i = 0; i < AMREX_SPACEDIM; i++)
-                AMREX_ASSERT(p.pos(i) < grid_box.hi(i));
+            for(int i=0; i < AMREX_SPACEDIM; i++)
+                AMREX_ASSERT(p.pos(i) < geom.ProbHi(i));
 
             // the real struct data
             for (int i = 0; i < NStructReal; i++) {
@@ -1438,6 +1448,7 @@ InitNRandomPerCell (int n_per_cell, const ParticleInitData& pdata)
     ParticleLocData pld;
     ParticleType p;
     Real r;
+    ParticleReal x;
 
     // We'll generate the particles in parallel -- but no tiling here.
     for (MFIter mfi(*m_dummy_mf[0], false); mfi.isValid(); ++mfi)
@@ -1457,6 +1468,8 @@ InitNRandomPerCell (int n_per_cell, const ParticleInitData& pdata)
         host_int_attribs.reserve(15);
         host_int_attribs.resize(finestLevel()+1);
 
+        const Real* xlo = geom.ProbLo();
+        const Real* xhi = geom.ProbHi();
         for (IntVect beg = grid.smallEnd(), end=grid.bigEnd(),
                     cell = grid.smallEnd(); cell <= end; grid.next(cell)) {
 
@@ -1464,15 +1477,13 @@ InitNRandomPerCell (int n_per_cell, const ParticleInitData& pdata)
             {
                 // the real struct data
                 for (int i = 0; i < AMREX_SPACEDIM; i++) {
-                    constexpr int max_iter = 10;
-                    int iter = 0;
-                    while (iter < max_iter) {
+                    do
+                    {
                         r = amrex::Random();
-                        p.pos(i) = static_cast<ParticleReal>(grid_box.lo(i) + (r + cell[i]-beg[i])*dx[i]);
-                        if (p.pos(i) < grid_box.hi(i)) break;
-                        iter++;
+                        x = static_cast<ParticleReal>(grid_box.lo(i) + (r + cell[i]-beg[i])*dx[i]);
                     }
-                    AMREX_ASSERT(p.pos(i) < grid_box.hi(i));
+                    while (static_cast<ParticleReal>(x) < static_cast<ParticleReal>(xlo[i]) || static_cast<ParticleReal>(x) >= static_cast<ParticleReal>(xhi[i]) || static_cast<ParticleReal>(x) >= static_cast<ParticleReal>(grid_box.hi(i)) || static_cast<ParticleReal>(x) < static_cast<ParticleReal>(grid_box.lo(i)));
+                    p.pos(i) = static_cast<ParticleReal>(x);
                 }
 
                 for (int i = 0; i < NStructReal; i++) {
