@@ -1267,7 +1267,6 @@ ParticleContainer<NStructReal, NStructInt, NArrayReal, NArrayInt, Allocator>
     {
         Box grid = m_gdb->ParticleBoxArray(0)[mfi.index()];
         RealBox grid_box = RealBox(grid,dx,geom.ProbLo());
-        ParticleReal x,y,z;
         const Real* xlo = geom.ProbLo();
         const Real* xhi = geom.ProbHi();
 
