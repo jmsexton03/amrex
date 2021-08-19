@@ -2525,6 +2525,30 @@ FabArrayBase::is_cell_centered () const noexcept
     return boxArray().ixType().cellCentered();
 }
 
+bool
+FabArrayBase::isFusingCandidate () const noexcept
+{
+#ifdef AMREX_USE_GPU
+    // This is fine tuned on MI100.
+    // For V100 and A100, it is not very sensitive to the choice here.
+    const int n = local_size();
+    if (n <= 1) {
+        return false;
+    } else if (n > 8) {
+        return true;
+    } else {
+        for (int i = 0; i < n; ++i) {
+            if (boxarray[indexArray[i]].numPts() <= Long(65*65*65)) {
+                return true;
+            }
+        }
+        return false;
+    }
+#else
+    return false;
+#endif
+}
+
 #ifdef AMREX_USE_GPU
 
 FabArrayBase::ParForInfo::ParForInfo (const FabArrayBase& fa, const IntVect& nghost, int nthreads)
@@ -2534,6 +2558,7 @@ FabArrayBase::ParForInfo::ParForInfo (const FabArrayBase& fa, const IntVect& ngh
       m_nthreads(nthreads),
       m_nblocks_x({nullptr,nullptr})
 {
+    Vector<Box> boxes;
     Vector<Long> ncells;
     ncells.reserve(fa.indexArray.size());
     for (int K : fa.indexArray) {
@@ -2543,14 +2568,15 @@ FabArrayBase::ParForInfo::ParForInfo (const FabArrayBase& fa, const IntVect& ngh
             b.grow(nghost);
             N = b.numPts();
         }
+        boxes.push_back(b);
         ncells.push_back(N);
     }
-    m_nblocks_x = detail::build_par_for_nblocks(ncells, nthreads);
+    detail::build_par_for_nblocks(m_hp, m_dp, m_nblocks_x, m_boxes, boxes, ncells, nthreads);
 }
 
 FabArrayBase::ParForInfo::~ParForInfo ()
 {
-    detail::destroy_par_for_nblocks(m_nblocks_x);
+    detail::destroy_par_for_nblocks(m_hp, m_dp);
 }
 
 FabArrayBase::ParForInfo const&
