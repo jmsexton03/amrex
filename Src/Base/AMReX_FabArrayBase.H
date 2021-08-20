@@ -28,6 +28,30 @@ template <typename FAB> class FabArray;
 
 namespace EB2 { class IndexSpace; }
 
+//**************************************
+
+extern bool in_print_region;
+
+inline bool inPrintRegion() noexcept { return in_print_region; }
+inline bool notInPrintRegion() noexcept { return !in_print_region; }
+
+inline bool setPrintRegion (bool print) noexcept {
+    bool r = in_print_region;
+    in_print_region = print;
+    return r;
+}
+
+struct PrintSafeGuard
+{
+    explicit PrintSafeGuard (bool flag) noexcept
+        : m_old(setPrintRegion(flag)) {}
+    ~PrintSafeGuard () { setPrintRegion(m_old); }
+private:
+    bool m_old;
+};
+
+//*************************************
+
 class FabArrayBase
 {
     friend class MFIter;
@@ -299,13 +323,16 @@ public:
     //! The maximum number of components to copy() at a time.
     static AMREX_EXPORT int MaxComp;
 
-    //! Output CPC into files
+    //! Output comm patterns to files
+    static AMREX_EXPORT bool FBVerbose;
     static AMREX_EXPORT bool CPCVerbose;
 
     //! Output CPCs into this directory
+    static AMREX_EXPORT std::string FBDirName;
     static AMREX_EXPORT std::string CPCDirName;
 
-    //! CPC ID
+    //! Count for comm cache ids
+    static AMREX_EXPORT int FBid;
     static AMREX_EXPORT int CPCid;
 
     //! Initialize from ParmParse with "fabarray" prefix.
@@ -509,6 +536,7 @@ public:
         Periodicity  m_period;
         //
         Long         m_nuse;
+        int          m_id;
         bool         m_multi_ghost = false;
         //
 #if ( defined(__CUDACC__) && (__CUDACC_VER_MAJOR__ >= 10) )
@@ -516,7 +544,7 @@ public:
         CudaGraph<CopyMemory> m_copyToBuffer;
         CudaGraph<CopyMemory> m_copyFromBuffer;
 #endif
-        //
+        void print () const;
         Long bytes () const;
     private:
         void define_fb (const FabArrayBase& fa);
@@ -553,6 +581,8 @@ public:
         ~CPC ();
 
         Long bytes () const;
+
+        void print () const;
 
         BDKey       m_srcbdk;
         BDKey       m_dstbdk;
