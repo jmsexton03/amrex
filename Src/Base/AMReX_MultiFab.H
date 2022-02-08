@@ -43,6 +43,16 @@ public:
     * from FabArray.
     */
     MultiFab () noexcept;
+
+    /**
+    * \brief Constructs an empty MultiFab.  Data can be defined at a later
+    * time using the define member functions inherited from FabArray.  If
+    * `define` is called later with a nulltpr as MFInfo's arena, the default
+    * Arena `a` will be used.  If the arena in MFInfo is not a nullptr, the
+    * MFInfo's arena will be used.
+    */
+    explicit MultiFab (Arena* a) noexcept;
+
     /**
     * \brief
     * Constructs a MultiFab
@@ -689,6 +699,11 @@ inline void GccPlacaterMF ()
     std::allocator<MultiFab const*> a2;
     std::allocator<FabArray<FArrayBox>*> a3;
     std::allocator<FabArray<FArrayBox> const*> a4;
+
+    amrex::ignore_unused(a1);
+    amrex::ignore_unused(a2);
+    amrex::ignore_unused(a3);
+    amrex::ignore_unused(a4);
 }
 #endif
 

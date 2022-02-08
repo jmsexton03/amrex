@@ -55,7 +55,7 @@ ParticleContainer<NStructReal, NStructInt, NArrayReal, NArrayInt, Allocator> :: 
                       "sizeof ParticleType is not a multiple of sizeof RealType");
 
         ParmParse pp("particles");
-        pp.query("do_tiling", do_tiling);
+        pp.queryAdd("do_tiling", do_tiling);
         Vector<int> tilesize(AMREX_SPACEDIM);
         if (pp.queryarr("tile_size", tilesize, 0, AMREX_SPACEDIM)) {
             for (int i=0; i<AMREX_SPACEDIM; ++i) tile_size[i] = tilesize[i];
@@ -66,8 +66,9 @@ ParticleContainer<NStructReal, NStructInt, NArrayReal, NArrayInt, Allocator> :: 
         //                   && std::is_trivial<ParticleType>::value,
         //                      "Particle type must be standard layout and trivial.");
 
-        pp.query("use_prepost", usePrePost);
-        pp.query("do_unlink", doUnlink);
+        pp.queryAdd("use_prepost", usePrePost);
+        pp.queryAdd("do_unlink", doUnlink);
+        pp.queryAdd("do_mem_efficient_sort", memEfficientSort);
 
         initialized = true;
     }
@@ -1063,19 +1064,19 @@ template <int NStructReal, int NStructInt, int NArrayReal, int NArrayInt,
           template<class> class Allocator>
 void
 ParticleContainer<NStructReal, NStructInt, NArrayReal, NArrayInt, Allocator>
-::Redistribute (int lev_min, int lev_max, int nGrow, int local)
+::Redistribute (int lev_min, int lev_max, int nGrow, int local, bool remove_negative)
 {
 #ifdef AMREX_USE_GPU
     if ( Gpu::inLaunchRegion() )
     {
-        RedistributeGPU(lev_min, lev_max, nGrow, local);
+        RedistributeGPU(lev_min, lev_max, nGrow, local, remove_negative);
     }
     else
     {
-        RedistributeCPU(lev_min, lev_max, nGrow, local);
+        RedistributeCPU(lev_min, lev_max, nGrow, local, remove_negative);
     }
 #else
-    RedistributeCPU(lev_min, lev_max, nGrow, local);
+    RedistributeCPU(lev_min, lev_max, nGrow, local, remove_negative);
 #endif
 }
 
@@ -1110,18 +1111,62 @@ ParticleContainer<NStructReal, NStructInt, NArrayReal, NArrayInt, Allocator>::So
             const size_t np = aos.numParticles();
             auto pstruct_ptr = aos().dataPtr();
 
-            ParticleTileType ptile_tmp;
-            ptile_tmp.define(m_num_runtime_real, m_num_runtime_int);
-            ptile_tmp.resize(np);
-
             const Box& box = mfi.validbox();
 
             int ntiles = numTilesInBox(box, true, bin_size);
 
             m_bins.build(np, pstruct_ptr, ntiles, GetParticleBin{plo, dxi, domain, bin_size, box});
+            auto inds = m_bins.permutationPtr();
 
-            gatherParticles(ptile_tmp, ptile, np, m_bins.permutationPtr());
-            ptile.swap(ptile_tmp);
+            if (memEfficientSort) {
+                {
+                    ParticleVector tmp_particles(np);
+                    auto src = ptile.getParticleTileData();
+                    ParticleType* dst = tmp_particles.data();
+
+                    AMREX_HOST_DEVICE_FOR_1D( np, i,
+                    {
+                        dst[i] = src.m_aos[inds[i]];
+                    });
+
+                    Gpu::synchronize();
+                    ptile.GetArrayOfStructs()().swap(tmp_particles);
+                }
+
+                RealVector tmp_real(np);
+                for (int comp = 0; comp < NArrayReal + m_num_runtime_real; ++comp) {
+                    auto src = ptile.GetStructOfArrays().GetRealData(comp).data();
+                    ParticleReal* dst = tmp_real.data();
+                    AMREX_HOST_DEVICE_FOR_1D( np, i,
+                    {
+                        dst[i] = src[inds[i]];
+                    });
+
+                    Gpu::synchronize();
+
+                    ptile.GetStructOfArrays().GetRealData(comp).swap(tmp_real);
+                }
+
+                IntVector tmp_int(np);
+                for (int comp = 0; comp < NArrayInt + m_num_runtime_int; ++comp) {
+                    auto src = ptile.GetStructOfArrays().GetIntData(comp).data();
+                    int* dst = tmp_int.data();
+                    AMREX_HOST_DEVICE_FOR_1D( np, i,
+                    {
+                        dst[i] = src[inds[i]];
+                    });
+
+                    Gpu::synchronize();
+
+                    ptile.GetStructOfArrays().GetIntData(comp).swap(tmp_int);
+                }
+            } else {
+                ParticleTileType ptile_tmp;
+                ptile_tmp.define(m_num_runtime_real, m_num_runtime_int);
+                ptile_tmp.resize(np);
+                gatherParticles(ptile_tmp, ptile, np, m_bins.permutationPtr());
+                ptile.swap(ptile_tmp);
+            }
         }
     }
 }
@@ -1133,7 +1178,7 @@ template <int NStructReal, int NStructInt, int NArrayReal, int NArrayInt,
           template<class> class Allocator>
 void
 ParticleContainer<NStructReal, NStructInt, NArrayReal, NArrayInt, Allocator>
-::RedistributeGPU (int lev_min, int lev_max, int nGrow, int local)
+::RedistributeGPU (int lev_min, int lev_max, int nGrow, int local, bool remove_negative)
 {
 #ifdef AMREX_USE_GPU
 
@@ -1183,7 +1228,7 @@ ParticleContainer<NStructReal, NStructInt, NArrayReal, NArrayInt, Allocator>
 
             int num_stay = partitionParticlesByDest(src_tile, assign_grid, BufferMap(),
                                                     geom, lev, gid, tid,
-                                                    lev_min, lev_max, nGrow);
+                                                    lev_min, lev_max, nGrow, remove_negative);
 
             int num_move = np - num_stay;
             new_sizes[lev][gid] = num_stay;
@@ -1272,7 +1317,7 @@ ParticleContainer<NStructReal, NStructInt, NArrayReal, NArrayInt, Allocator>
     Gpu::Device::synchronize();
     AMREX_ASSERT(numParticlesOutOfRange(*this, lev_min, lev_max, nGrow) == 0);
 #else
-    amrex::ignore_unused(lev_min,lev_max,nGrow,local);
+    amrex::ignore_unused(lev_min,lev_max,nGrow,local,remove_negative);
 #endif
 }
 
@@ -1283,7 +1328,7 @@ template <int NStructReal, int NStructInt, int NArrayReal, int NArrayInt,
           template<class> class Allocator>
 void
 ParticleContainer<NStructReal, NStructInt, NArrayReal, NArrayInt, Allocator>
-::RedistributeCPU (int lev_min, int lev_max, int nGrow, int local)
+::RedistributeCPU (int lev_min, int lev_max, int nGrow, int local, bool remove_negative)
 {
   BL_PROFILE("ParticleContainer::RedistributeCPU()");
 
@@ -1389,6 +1434,11 @@ ParticleContainer<NStructReal, NStructInt, NArrayReal, NArrayInt, Allocator>
               Long pindex = 0;
               while (pindex <= last) {
                   ParticleType& p = aos[pindex];
+
+                  if ((remove_negative == false) && (p.id() < 0)) {
+                      ++pindex;
+                      continue;
+                  }
 
                   if (p.id() < 0)
                   {

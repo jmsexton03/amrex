@@ -34,7 +34,11 @@ sudo apt-get install -y --no-install-recommends \
     libnuma-dev     \
     libopenmpi-dev  \
     openmpi-bin     \
-    rocm-dev roctracer-dev rocprofiler-dev rocrand rocprim
+    rocm-dev        \
+    roctracer-dev   \
+    rocprofiler-dev \
+    rocrand-dev     \
+    rocprim-dev
 
 # activate
 #
@@ -42,6 +46,7 @@ source /etc/profile.d/rocm.sh
 hipcc --version
 which clang
 which clang++
+which flang
 
 # cmake-easyinstall
 #

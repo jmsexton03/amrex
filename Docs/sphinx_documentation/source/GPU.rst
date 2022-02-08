@@ -158,8 +158,8 @@ For example, ``COMP=pgi`` alone will compile C/C++ codes with NVCC/GCC
 and Fortran codes with PGI, and link with PGI.  Using ``COMP=pgi`` and
 ``NVCC_HOST_COMP=pgi`` will compile C/C++ codes with PGI and NVCC/PGI.
 
-You can use ``Tutorials/Basic/HelloWorld_C`` to test your programming
-environment.  For example, building with:
+You can use ``amrex-tutorials/ExampleCodes/Basic/HelloWorld_C/``
+to test your programming environment.  For example, building with:
 
 .. highlight:: console
 
@@ -319,8 +319,8 @@ we provide the helper function ``setup_target_for_cuda_compilation()``:
 
 
 
-Enabling HIP support (experimental)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Enabling HIP Support
+^^^^^^^^^^^^^^^^^^^^
 
 To build AMReX with HIP support in CMake, add
 ``-DAMReX_GPU_BACKEND=HIP -DAMReX_AMD_ARCH=<target-arch> -DCMAKE_CXX_COMPILER=<your-hip-compiler>``
@@ -350,8 +350,8 @@ Below is an example configuration for HIP on Tulip:
    cmake --build build -j 6
 
 
-Enabling SYCL support (experimental)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Enabling SYCL Support
+^^^^^^^^^^^^^^^^^^^^^
 
 To build AMReX with SYCL support in CMake, add
 ``-DAMReX_GPU_BACKEND=SYCL -DCMAKE_CXX_COMPILER=<your-sycl-compiler>``
@@ -390,6 +390,8 @@ Below is an example configuration for SYCL:
    | Variable Name                | Description                                     | Default     | Possible values |
    +==============================+=================================================+=============+=================+
    | AMReX_DPCPP_AOT              | Enable DPCPP ahead-of-time compilation          | NO          | YES, NO         |
+   +------------------------------+-------------------------------------------------+-------------+-----------------+
+   | AMREX_INTEL_ARCH             | Specify target if AOT is enabled                | None        | Gen9, etc.      |
    +------------------------------+-------------------------------------------------+-------------+-----------------+
    | AMReX_DPCPP_SPLIT_KERNEL     | Enable DPCPP kernel splitting                   | YES         | YES, NO         |
    +------------------------------+-------------------------------------------------+-------------+-----------------+
@@ -461,15 +463,17 @@ specific type of GPU memory:
 
 .. table:: Memory Arenas
 
-    +---------------------+----------------------------+
-    | Arena               |        Memory Type         |
-    +=====================+============================+
-    | The_Arena()         |  managed or device memory  |
-    +---------------------+----------------------------+
-    | The_Managed_Arena() |  managed memory            |
-    +---------------------+----------------------------+
-    | The_Pinned_Arena()  |  pinned memory             |
-    +---------------------+----------------------------+
+    +---------------------+---------------------------------------------------+
+    | Arena               |        Memory Type                                |
+    +=====================+===================================================+
+    | The_Arena()         |  managed or device memory                         |
+    +---------------------+---------------------------------------------------+
+    | The_Device_Arena()  |  device memory, could be an alias to The_Arena()  |
+    +---------------------+---------------------------------------------------+
+    | The_Managed_Arena() |  managed memory, could be an alias to The_Arena() |
+    +---------------------+---------------------------------------------------+
+    | The_Pinned_Arena()  |  pinned memory                                    |
+    +---------------------+---------------------------------------------------+
 
 .. raw:: latex
 
@@ -496,6 +500,33 @@ gradually. The behavior of :cpp:`The_Managed_Arena()` likewise depends on the
 :cpp:`The_Managed_Arena()` is a separate pool of managed memory. If
 ``amrex.the_arena_is_managed=1``, :cpp:`The_Managed_Arena()` is simply aliased
 to :cpp:`The_Arena()` to reduce memory fragmentation.
+
+In :cpp:`amrex::Initialize`, a large amount of GPU device memory is
+allocated and is kept in :cpp:`The_Arena()`.  The default is 3/4 of the
+total device memory, and it can be changed with a :cpp:`ParmParse`
+parameter, ``amrex.the_arena_init_size``, in the unit of bytes.  The default
+initial size for other arenas is 8388608 (i.e., 8 MB).  For
+:cpp:`The_Managed_Arena()` and :cpp:`The_Device_Arena()`, it can be changed
+with ``amrex.the_managed_arena_init_size`` and
+``amrex.the_device_arena_init_size``, respectively, if they are not an alias
+to :cpp:`The_Arena()`.  For :cpp:`The_Pinned_Arena()`, it can be changed
+with ``amrex.the_pinned_arena_init_size``.  The user can also specify a
+release threshold for these arenas.  If the memory usage in an arena is
+below the threshold, the arena will keep the memory for later reuse,
+otherwise it will try to release memory back to the system if it is not
+being used.  By default, the release threshold for :cpp:`The_Arena()` is set
+to be a huge number that prevents the memory being released automatically,
+and it can be changed with a parameter,
+``amrex.the_arena_release_threshold``.  For :cpp:`The_Pinned_Arena()`, the
+default release threshold is the size of the total device memory, and the
+runtime parameter is ``amrex.the_pinned_arena_release_threshold``.  If it is
+a separate arena, the behavior of :cpp:`The_Device_Area()` or
+:cpp:`The_Managed_Arena()` can be changed with
+``amrex.the_device_arena_release_threshold`` or
+``amrex.the_managed_arena_release_threshold``.  Note that the units for all
+the parameter discussed above are bytes.  All these areans also have a
+member function :cpp:`freeUnused()` that can be used to manually release
+unused memory back to the system.
 
 If you want to print out the current memory usage
 of the Arenas, you can call :cpp:`amrex::Arena::PrintUsage()`.
@@ -939,7 +970,7 @@ compact and readable format.
 
 AMReX also provides a variation of the launch function that is implemented as a
 C++ macro.  It behaves identically to the function, but hides the lambda function
-from to the user.  There are some subtle differences between the two implementations,
+from the user.  There are some subtle differences between the two implementations,
 that will be discussed.  It is up to the user to select which version they would like
 to use.  For simplicity, the function variation will be discussed throughout the rest of
 this documentation, however all code snippets will also include the macro variation
@@ -1627,89 +1658,3 @@ by "amrex" in your :cpp:`inputs` file.
 |                            | requested allocation, AMReX will call AMReX::Abort() with an error    |             |             |
 |                            | describing how much free memory there is and what was requested.      |             |             |
 +----------------------------+-----------------------------------------------------------------------+-------------+-------------+
-
-Basic Gpu Debugging
-===================
-
-
-The asynchronous nature of GPU execution can make tracking down bugs complex.
-The relative timing of improperly coded functions can cause variations in output and the timing of error messages
-may not linearly relate to a place in the code.
-One strategy to isolate specific kernel failures is to add ``amrex::Gpu::synchronize()`` or ``amrex::Gpu::streamSynchronize()`` after every ``ParallelFor`` or similar ``amrex::launch`` type call.
-These synchronization commands will halt execution of the code until the GPU or GPU stream, respectively, has finished processing all previously requested tasks, thereby making it easier to locate and identify sources of error.
-
-Debuggers and Related Tools
----------------------------
-
-Users may also find debuggers useful. Architecture agnostic tools include ``gdb``, ``hpctoolkit``, and ``Valgrind``. Note that there are architecture specific implementations of ``gdb`` such as ``cuda-gdb``, ``rocgdb``, ``gdb-amd``, and the Intel ``gdb``.
-Usage of several of these variations are described in the following sections.
-
-For advance debugging topics and tools, refer to system-specific documentation (e.g. https://docs.olcf.ornl.gov/systems/summit_user_guide.html#debugging).
-
-
-CUDA-Specific Tests
--------------------
-
-- To test if your kernels have launched, run:
-
-  ::
-
-    nvprof ./main3d.xxx
-
-  If using NVIDIA Nsight Compute instead, access ``nvprof`` functionality with:
-
-  ::
-
-    nsys nvprof ./main3d.xxx
-
-- Run ``nvprof -o profile%p.nvvp ./main3d.xxxx`` or
-  ``nsys profile -o nsys_out.%q{SLURM_PROCID}.%q{SLURM_JOBID} ./main3d.xxx`` for
-  a small problem and examine page faults using ``nvvp`` or ``nsight-sys $(pwd)/nsys_out.#.######.qdrep``.
-
-- Run under ``cuda-memcheck`` to identify memory errors.
-
-- Run under ``cuda-gdb`` to identify kernel errors.
-
-- To help identify race conditions, globally disable asynchronicity of kernel launches for all
-  CUDA applications by setting ``CUDA_LAUNCH_BLOCKING=1`` in your environment variables. This
-  will ensure that only one CUDA kernel will run at a time.
-
-AMD ROCm-Specific Tests
------------------------
-
-- To test if your kernels have launched, run:
-
-  ::
-
-    rocprof ./main3d.xxx
-
-- Run ``rocprof  --hsa-trace --stats --timestamp on --roctx-trace ./main3d.xxxx`` for
-  a small problem and examine tracing using ``chrome://tracing``.
-
-- Run under ``rocgdb`` for source-level debugging.
-
-- To help identify if there are race conditions, globally disable asynchronicity of kernel launches by setting ``CUDA_LAUNCH_BLOCKING=1`` or ``HIP_LAUNCH_BLOCKING=1``
-  in your environment variables. This will ensure only one kernel will run at a time.
-  See the `AMD ROCm docs' chicken bits section`_ for more debugging environment variables.
-
-.. _`AMD ROCm docs' chicken bits section`: https://rocmdocs.amd.com/en/latest/Programming_Guides/HIP_Debugging.html#chicken-bits
-
-Intel GPU Specific Tests
-------------------------
-
-- To test if your kernels have launched, run:
-
-  ::
-
-    ./ze_tracer ./main3d.xxx
-
-- Run Intel Advisor,
-  ``advisor --collect=survey ./main3d.xxx`` for
-  a small problem with 1 MPI process and examine metrics.
-
-- Run under ``gdb`` with the `Intel Distribution for GDB`_.
-
-- To report back-end information, set ``ZE_DEBUG=1`` in your environment variables.
-
-.. _`Intel Distribution for GDB`: https://software.intel.com/content/www/us/en/develop/tools/oneapi/components/distribution-for-gdb.html
-

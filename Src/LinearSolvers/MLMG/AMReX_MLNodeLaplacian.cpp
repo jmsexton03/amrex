@@ -124,6 +124,30 @@ MLNodeLaplacian::define (const Vector<Geometry>& a_geom,
 #endif
 
 void
+MLNodeLaplacian::resizeMultiGrid (int new_size)
+{
+    if (!   m_sigma.empty()) {
+        if (m_sigma[0].size() > new_size) {
+            m_sigma[0].resize(new_size);
+        }
+    }
+
+    if (!   m_stencil.empty()) {
+        if (m_stencil[0].size() > new_size) {
+            m_stencil[0].resize(new_size);
+        }
+    }
+
+    if (!   m_s0_norm0.empty()) {
+        if (m_s0_norm0[0].size() > new_size) {
+            m_s0_norm0[0].resize(new_size);
+        }
+    }
+
+    MLNodeLinOp::resizeMultiGrid(new_size);
+}
+
+void
 MLNodeLaplacian::unimposeNeumannBC (int amrlev, MultiFab& rhs) const
 {
     if (m_coarsening_strategy == CoarseningStrategy::RAP) {
@@ -149,7 +173,24 @@ void
 MLNodeLaplacian::setSigma (int amrlev, const MultiFab& a_sigma)
 {
     AMREX_ALWAYS_ASSERT(m_sigma[amrlev][0][0]);
-    MultiFab::Copy(*m_sigma[amrlev][0][0], a_sigma, 0, 0, 1, 0);
+
+    // If we are going to use sigma with AMREX_SPACEDIM components but have only allocated sigma with idim=0 before,
+    //    we need to allocate sigma for the other directions here
+    if (a_sigma.nComp() > 1)
+    {
+        AMREX_ALWAYS_ASSERT(a_sigma.nComp() == AMREX_SPACEDIM);
+        for (int idim = 1; idim < AMREX_SPACEDIM; idim++)
+            m_sigma[amrlev][0][idim] = std::make_unique<MultiFab>(m_grids[amrlev][0],
+                                                                  m_dmap[amrlev][0],
+                                                                  1, 1, MFInfo());
+        setMapped(true);
+
+        for (int idim = 0; idim < AMREX_SPACEDIM; idim++)
+            MultiFab::Copy(*m_sigma[amrlev][0][idim], a_sigma, idim, 0, 1, 0);
+
+    } else {
+        MultiFab::Copy(*m_sigma[amrlev][0][0], a_sigma, 0, 0, 1, 0);
+    }
 }
 
 void
@@ -380,7 +421,8 @@ MLNodeLaplacian::interpolation (int amrlev, int fmglev, MultiFab& fine, const Mu
                 mlndlap_interpadd_c(i, j, k, fine_ma[box_no], crse_ma[box_no], msk_ma[box_no]);
             });
         }
-        else if (m_use_harmonic_average && fmglev > 0)
+        else if ( (m_use_harmonic_average && fmglev > 0) ||
+                   m_use_mapped )
         {
             AMREX_D_TERM(MultiArray4<Real const> const& sx_ma = sigma[0]->const_arrays();,
                          MultiArray4<Real const> const& sy_ma = sigma[1]->const_arrays();,
@@ -510,7 +552,7 @@ MLNodeLaplacian::restrictInteriorNodes (int camrlev, MultiFab& crhs, MultiFab& a
     const auto hibc = HiBC();
 
     const iMultiFab& fdmsk = *m_dirichlet_mask[camrlev+1][0];
-    const auto& stencil    =  m_stencil[camrlev+1][0];
+    const auto& stencil    =  m_nosigma_stencil[camrlev+1];
 
     MultiFab cfine(amrex::coarsen(fba, amrrr), fdm, 1, 0);
 
@@ -602,7 +644,8 @@ MLNodeLaplacian::normalize (int amrlev, int mglev, MultiFab& mf) const
                 mlndlap_normalize_sten(i,j,k,ma[box_no],sten_ma[box_no],dmsk_ma[box_no],s0_norm0);
             });
         }
-        else if (m_use_harmonic_average && mglev > 0)
+        else if ( (m_use_harmonic_average && mglev > 0) ||
+                   m_use_mapped )
         {
             AMREX_D_TERM(const auto& sx_ma = sigma[0]->const_arrays();,
                          const auto& sy_ma = sigma[1]->const_arrays();,
