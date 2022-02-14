@@ -734,7 +734,7 @@ FabArray<FAB>::pack_send_buffer_gpu (FabArray<FAB> const& src, int scomp, int nc
 
     char* pbuffer = send_data[0];
     std::size_t szbuffer = 0;
-#if 0
+#ifdef AMREX_USE_FBI_COPYASYNC_PACK
     // For linear solver test on summit, this is slower than writing to
     // pinned memory directly on device.
     if (! ParallelDescriptor::UseGpuAwareMpi()) {
@@ -793,7 +793,7 @@ FabArray<FAB>::unpack_recv_buffer_gpu (FabArray<FAB>& dst, int dcomp, int ncomp,
     if (N_rcvs == 0) return;
 
     char* pbuffer = recv_data[0];
-#if 0
+#ifdef AMREX_USE_FBI_COPYASYNC_UNPACK
     std::size_t szbuffer = 0;
     // For linear solver test on summit, this is slower than writing to
     // pinned memory directly on device.
