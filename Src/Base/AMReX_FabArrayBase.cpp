@@ -30,6 +30,14 @@ namespace amrex {
 // Set default values in Initialize()!!!
 //
 int     FabArrayBase::MaxComp;
+bool    FabArrayBase::FBVerbose;
+bool    FabArrayBase::CPCVerbose;
+std::string FabArrayBase::FBDirName;
+std::string FabArrayBase::CPCDirName;
+int     FabArrayBase::FBid;
+int     FabArrayBase::CPCid;
+
+bool    in_print_region = true;
 
 #if defined(AMREX_USE_GPU)
 
@@ -101,6 +109,12 @@ FabArrayBase::Initialize ()
     // Set default values here!!!
     //
     FabArrayBase::MaxComp           = 25;
+    FabArrayBase::FBVerbose         = false;
+    FabArrayBase::CPCVerbose        = false;
+    FabArrayBase::CPCDirName        = "FBs";
+    FabArrayBase::CPCDirName        = "CPCs";
+    FabArrayBase::CPCid             = 1;
+    FabArrayBase::FBid              = 1;
 
     ParmParse pp("fabarray");
 
@@ -329,8 +343,41 @@ FabArrayBase::CPC::CPC (const BoxArray& dstba, const DistributionMapping& dstdm,
     this->define(dstba, dstdm, dstidx, srcba, srcdm, srcidx, myproc);
 }
 
+void
+FabArrayBase::CPC::print () const
+{
+    if ((in_print_region) && (CPCVerbose))
+    {
+        amrex::Print() << " >> Writing CPC " << m_id << std::endl;
+
+        AllPrintToFile file(CPCDirName + "/CPC" + std::to_string(m_id));
+
+        // Number of uses
+        file << m_nuse << std::endl;
+
+        // Locals
+        for (const auto& tag : *m_LocTags)
+        {
+            file << tag.srcIndex << " " << tag.sbox << " -> "
+                 << tag.dstIndex << " " << tag.dbox << std::endl;
+        }
+
+        // Sends -- (No recvs. Removes duplicate comms after concatenation).
+        for (auto const& dst: *m_SndTags)
+        {
+            for (auto const& tag: dst.second)
+            {
+                file << tag.srcIndex << " " << tag.sbox << " -> "
+                     << dst.first << " " << tag.dbox << std::endl;
+            }
+        }
+    }
+}
+
 FabArrayBase::CPC::~CPC ()
-{}
+{
+    if (CPCVerbose) { print(); }
+}
 
 void
 FabArrayBase::CPC::define (const BoxArray& ba_dst, const DistributionMapping& dm_dst,
@@ -343,6 +390,8 @@ FabArrayBase::CPC::define (const BoxArray& ba_dst, const DistributionMapping& dm
 
     BL_ASSERT(ba_dst.size() > 0 && ba_src.size() > 0);
     BL_ASSERT(ba_dst.ixType() == ba_src.ixType());
+
+    m_id = CPCid++;
 
     m_LocTags = std::make_unique<CopyComTag::CopyComTagsContainer>();
     m_SndTags = std::make_unique<CopyComTag::MapOfCopyComTagContainers>();
@@ -649,6 +698,8 @@ FabArrayBase::FB::FB (const FabArrayBase& fa, const IntVect& nghost,
     m_LocTags = std::make_unique<CopyComTag::CopyComTagsContainer>();
     m_SndTags = std::make_unique<CopyComTag::MapOfCopyComTagContainers>();
     m_RcvTags = std::make_unique<CopyComTag::MapOfCopyComTagContainers>();
+
+    m_id = FBid++;
 
     if (!fa.IndexArray().empty()) {
         if (enforce_periodicity_only) {
@@ -1030,8 +1081,41 @@ FabArrayBase::FB::define_epo (const FabArrayBase& fa)
     }
 }
 
+void
+FabArrayBase::FB::print () const
+{
+    if ((in_print_region) && (FBVerbose))
+    {
+        amrex::Print() << " >> Writing FB " << m_id << std::endl;
+
+        AllPrintToFile file(CPCDirName + "/FB" + std::to_string(m_id));
+
+        // Number of uses
+        file << m_nuse << std::endl;
+
+        // Locals
+        for (const auto& tag : *m_LocTags)
+        {
+            file << tag.srcIndex << " " << tag.sbox << " -> "
+                 << tag.dstIndex << " " << tag.dbox << std::endl;
+        }
+
+        // Sends -- (No recvs. Removes duplicate comms after concatenation).
+        for (auto const& dst: *m_SndTags)
+        {
+            for (auto const& tag: dst.second)
+            {
+                 file << tag.srcIndex << " " << tag.sbox << " -> "
+                      << dst.first << " " << tag.dbox << std::endl;
+            }
+        }
+    }
+}
+
 FabArrayBase::FB::~FB ()
-{}
+{
+    if (FBVerbose) { print(); }
+}
 
 void
 FabArrayBase::flushFB (bool no_assertion) const
