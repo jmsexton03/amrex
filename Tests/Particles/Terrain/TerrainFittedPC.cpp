@@ -6,7 +6,7 @@ using namespace amrex;
 
 void
 TerrainFittedPC::
-InitParticles ()
+InitParticles (int)
 {
     BL_PROFILE("TerrainFittedPC::InitParticles");
 
@@ -51,7 +51,12 @@ InitParticles ()
 #else
         height_ptr = &height;
 #endif
-        Gpu::HostVector<ParticleType> host_particles;
+            Gpu::HostVector<ParticleType> host_particles;
+            std::array<Gpu::HostVector<ParticleReal>, NAR> host_real;
+            std::array<Gpu::HostVector<int>, NAI> host_int;
+
+            std::vector<Gpu::HostVector<ParticleReal> > host_runtime_real(NumRuntimeRealComps());
+            std::vector<Gpu::HostVector<int> > host_runtime_int(NumRuntimeIntComps());
         for (IntVect iv = tile_box.smallEnd(); iv <= tile_box.bigEnd(); tile_box.next(iv)) {
             if (iv[0] == 3) {
                 Real r[3] = {0.5, 0.5, 0.5};  // this means place at cell center
@@ -72,23 +77,70 @@ InitParticles ()
                 p.rdata(RealIdx::vy) = v[1];
                 p.rdata(RealIdx::vz) = v[2];
 
-                p.idata(IntIdx::k) = iv[2];  // particles carry their z-index
+                p.idata(IntIdx::i) = iv[0];  // particles carry their z-index
+                p.idata(IntIdx::j) = iv[1];  // particles carry their z-index
+		p.idata(IntIdx::k) = iv[2];  // particles carry their z-index
+
+		for (int i = NAR; i < NSR; ++i) p.rdata(i) = ParticleReal(p.id());
+		for (int i = NAI; i < NSI; ++i) p.idata(i) = int(p.id());
 
                 host_particles.push_back(p);
+		for (int i = 0; i < NAR; ++i)
+		    host_real[i].push_back(p.rdata(i));
+                for (int i = 0; i < NAI; ++i)
+		    host_int[i].push_back(p.idata(i));
+		for (int i = 0; i < NumRuntimeRealComps(); ++i)
+		    host_runtime_real[i].push_back(p.rdata(NAR+i));
+		for (int i = 0; i < NumRuntimeIntComps(); ++i)
+		    host_runtime_int[i].push_back(p.idata(NAI+i)));
            }
         }
 
-        auto& particles = GetParticles(lev);
-        auto& particle_tile = particles[std::make_pair(mfi.index(), mfi.LocalTileIndex())];
-        auto old_size = particle_tile.GetArrayOfStructs().size();
-        auto new_size = old_size + host_particles.size();
-        particle_tile.resize(new_size);
+            auto& particle_tile = DefineAndReturnParticleTile(lev, mfi.index(), mfi.LocalTileIndex());
+            auto old_size = particle_tile.GetArrayOfStructs().size();
+            auto new_size = old_size + host_particles.size();
+            particle_tile.resize(new_size);
 
-        Gpu::copy(Gpu::hostToDevice,
-                  host_particles.begin(),
-                  host_particles.end(),
-                  particle_tile.GetArrayOfStructs().begin() + old_size);
+            Gpu::copyAsync(Gpu::hostToDevice,
+                           host_particles.begin(),
+                           host_particles.end(),
+                           particle_tile.GetArrayOfStructs().begin() + old_size);
+
+            auto& soa = particle_tile.GetStructOfArrays();
+            for (int i = 0; i < NAR; ++i)
+            {
+                Gpu::copyAsync(Gpu::hostToDevice,
+                               host_real[i].begin(),
+                               host_real[i].end(),
+                               soa.GetRealData(i).begin() + old_size);
+            }
+
+            for (int i = 0; i < NAI; ++i)
+            {
+                Gpu::copyAsync(Gpu::hostToDevice,
+                               host_int[i].begin(),
+                               host_int[i].end(),
+                               soa.GetIntData(i).begin() + old_size);
+            }
+            for (int i = 0; i < NumRuntimeRealComps(); ++i)
+            {
+                Gpu::copyAsync(Gpu::hostToDevice,
+                               host_runtime_real[i].begin(),
+                               host_runtime_real[i].end(),
+                               soa.GetRealData(NAR+i).begin() + old_size);
+            }
+
+            for (int i = 0; i < NumRuntimeIntComps(); ++i)
+            {
+                Gpu::copyAsync(Gpu::hostToDevice,
+                               host_runtime_int[i].begin(),
+                               host_runtime_int[i].end(),
+                               soa.GetIntData(NAI+i).begin() + old_size);
+            }
+
+            Gpu::streamSynchronize();
     }
+    RedistributeLocal();
 }
 
 /*

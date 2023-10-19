@@ -58,10 +58,28 @@ public:
                                    amrex::DefaultAllocator, TerrainFittedAssignor>(geom, dmap, ba)
         {}
 
-    void InitParticles (const amrex::MultiFab& a_z_height);
+    void InitParticles (int);
 
     void AdvectWithUmac (amrex::MultiFab* umac, int level, amrex::Real dt,
                          const amrex::MultiFab& a_z_height);
+    void RedistributeLocal (bool remove_neg=true)
+    {
+        const int lev_min = 0;
+        const int lev_max = finestLevel();
+        const int nGrow = 0;
+        const int local = 1;
+        Redistribute(lev_min, lev_max, nGrow, local, remove_neg);
+    }
+
+    void RedistributeGlobal (bool remove_neg=true)
+    {
+        const int lev_min = 0;
+        const int lev_max = finestLevel();
+        const int nGrow = 0;
+        const int local = 0;
+        Redistribute(lev_min, lev_max, nGrow, local, remove_neg);
+    }
+
 };
 
 #endif
