@@ -52,7 +52,7 @@ void get_position_unit_cell(Real* r, const IntVect& nppc, int i_part)
                 int tid = mfi.LocalTileIndex();
                 auto& ptile = plev[std::make_pair(gid, tid)];
                 auto& aos   = ptile.GetArrayOfStructs();
-                ParticleType* pstruct = &(aos[0]);
+                ParticleType* pstruct = aos.data();
                 const size_t np = aos.numParticles();
                 amrex::ParallelFor( np, [=] AMREX_GPU_DEVICE (int i) noexcept
                 {
@@ -210,7 +210,7 @@ void testRedistribute ()
         size *= 2;
     }
 
-    TerrainFittedPC pc(geom, dm, ba);
+    TerrainFittedPC pc(geom[0], dm[0], ba[0]);
 
     IntVect nppc(params.num_ppc);
 
@@ -302,4 +302,6 @@ void testRedistribute ()
     // the way this test is set up, if we make it here we pass
     amrex::Print() << "pass \n";
     */
+    pc.WritePlotFile("plot", "particles");
+    //    pc.WriteAsciiFile("plot_ascii");
 }

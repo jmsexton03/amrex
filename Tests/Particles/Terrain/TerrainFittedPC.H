@@ -58,7 +58,7 @@ public:
                                    amrex::DefaultAllocator, TerrainFittedAssignor>(geom, dmap, ba)
         {}
 
-    void InitParticles (int);
+    void InitParticles ();
 
     void AdvectWithUmac (amrex::MultiFab* umac, int level, amrex::Real dt,
                          const amrex::MultiFab& a_z_height);

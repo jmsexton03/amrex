@@ -4,29 +4,35 @@
 
 using namespace amrex;
 
+static constexpr int NSR = 6;
+static constexpr int NSI = 3;
+static constexpr int NAR = 0;
+static constexpr int NAI = 0;
+
 void
 TerrainFittedPC::
-InitParticles (int)
+InitParticles ()
 {
     BL_PROFILE("TerrainFittedPC::InitParticles");
 
     const int lev = 0;
     const Real* dx = Geom(lev).CellSize();
     const Real* plo = Geom(lev).ProbLo();
-    MultiFab a_z_height(this->boxArray(),this->DistributionMapping(),3,0);
-
+    MultiFab a_z_height(this->amrex::ParticleContainerBase::ParticleBoxArray(0),this->amrex::ParticleContainerBase::ParticleDistributionMap(0),3,0);
+    auto domain = this->amrex::ParticleContainerBase::Geom(0).Domain();
+    auto probhi = this->amrex::ParticleContainerBase::Geom(0).ProbHi();
     for(MFIter mfi(a_z_height); mfi.isValid(); ++mfi)
     {
         const Box& tile_box  = mfi.tilebox();
-        auto& height_arr = a_z_height.array(mfi);
+        auto height_arr = a_z_height.array(mfi);
         Real r[3] = {0.5, 0.5, 0.5};  // this means place at cell center
         const Real* dx = Geom(lev).CellSize();
         const Real* plo = Geom(lev).ProbLo();
 
         amrex::ParallelFor( tile_box, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
         {
-	    Real x = plo[0] + r[0]*dx[0];
-	    Real y = plo[1] + r[1]*dx[1];
+	    Real x = plo[0] + r[0]*dx[0]*i;
+	    Real y = plo[1] + r[1]*dx[1]*j;
             height_arr(i,j,k,0) = 64 - x*x;
             height_arr(i,j,k,1) = 64 - y*y;
             height_arr(i,j,k,2) = 8;
@@ -38,6 +44,7 @@ InitParticles (int)
         const Box& tile_box  = mfi.tilebox();
         const auto& height = a_z_height[mfi];
         const FArrayBox* height_ptr = nullptr;
+	auto height_arr = a_z_height.array(mfi);
 #ifdef AMREX_USE_GPU
         std::unique_ptr<FArrayBox> hostfab;
         if (height.arena()->isManaged() || height.arena()->isDevice()) {
@@ -55,15 +62,15 @@ InitParticles (int)
             std::array<Gpu::HostVector<ParticleReal>, NAR> host_real;
             std::array<Gpu::HostVector<int>, NAI> host_int;
 
-            std::vector<Gpu::HostVector<ParticleReal> > host_runtime_real(NumRuntimeRealComps());
-            std::vector<Gpu::HostVector<int> > host_runtime_int(NumRuntimeIntComps());
+	    //            std::vector<Gpu::HostVector<ParticleReal> > host_runtime_real(NumRuntimeRealComps());
+	    //            std::vector<Gpu::HostVector<int> > host_runtime_int(NumRuntimeIntComps());
         for (IntVect iv = tile_box.smallEnd(); iv <= tile_box.bigEnd(); tile_box.next(iv)) {
-            if (iv[0] == 3) {
+            if (iv[2] == 3) {
                 Real r[3] = {0.5, 0.5, 0.5};  // this means place at cell center
                 Real v[3] = {0.0, 0.0, 0.0};  // with 0 initial velocity
 
-                Real x = (*height_ptr)(iv) + r[0]*((*height_ptr)(iv + IntVect(AMREX_D_DECL(0, 0, 1))) - (*height_ptr)(iv));
-                Real y = (*height_ptr)(iv) + r[1]*((*height_ptr)(iv + IntVect(AMREX_D_DECL(0, 0, 1))) - (*height_ptr)(iv));
+                Real x = (*height_ptr)(iv) + r[0]*((*height_ptr)(iv + IntVect(AMREX_D_DECL(1, 0, 0))) - (*height_ptr)(iv));
+                Real y = (*height_ptr)(iv) + r[1]*((*height_ptr)(iv + IntVect(AMREX_D_DECL(0, 1, 0))) - (*height_ptr)(iv));
                 Real z = (*height_ptr)(iv) + r[2]*((*height_ptr)(iv + IntVect(AMREX_D_DECL(0, 0, 1))) - (*height_ptr)(iv));
 
                 ParticleType p;
@@ -80,19 +87,22 @@ InitParticles (int)
                 p.idata(IntIdx::i) = iv[0];  // particles carry their z-index
                 p.idata(IntIdx::j) = iv[1];  // particles carry their z-index
 		p.idata(IntIdx::k) = iv[2];  // particles carry their z-index
-
+		//                amrex::Print()<<p<<" xyz "<<x<<" "<<y<<" "<<z<<" height "<<height_arr(iv[0],iv[1],iv[2],0)<<" "<<height_arr(iv[0],iv[1],iv[2],1)<<" "<<height_arr(iv[0],iv[1],iv[2],2)<<std::endl;
+		/*
 		for (int i = NAR; i < NSR; ++i) p.rdata(i) = ParticleReal(p.id());
 		for (int i = NAI; i < NSI; ++i) p.idata(i) = int(p.id());
-
+		*/
                 host_particles.push_back(p);
 		for (int i = 0; i < NAR; ++i)
 		    host_real[i].push_back(p.rdata(i));
                 for (int i = 0; i < NAI; ++i)
 		    host_int[i].push_back(p.idata(i));
+		/*
 		for (int i = 0; i < NumRuntimeRealComps(); ++i)
 		    host_runtime_real[i].push_back(p.rdata(NAR+i));
 		for (int i = 0; i < NumRuntimeIntComps(); ++i)
 		    host_runtime_int[i].push_back(p.idata(NAI+i)));
+		*/
            }
         }
 
@@ -122,6 +132,7 @@ InitParticles (int)
                                host_int[i].end(),
                                soa.GetIntData(i).begin() + old_size);
             }
+            /*
             for (int i = 0; i < NumRuntimeRealComps(); ++i)
             {
                 Gpu::copyAsync(Gpu::hostToDevice,
@@ -137,7 +148,7 @@ InitParticles (int)
                                host_runtime_int[i].end(),
                                soa.GetIntData(NAI+i).begin() + old_size);
             }
-
+	    */
             Gpu::streamSynchronize();
     }
     RedistributeLocal();
