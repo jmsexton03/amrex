@@ -31,9 +31,12 @@ InitParticles ()
 
         amrex::ParallelFor( tile_box, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
         {
-	    Real x = plo[0] + r[0]*dx[0]*(i);
-	    Real y = plo[1] + r[1]*dx[1]*(j);
-	    Real z = plo[2] + r[2]*dx[2]*(k);
+	    //	    Real x = plo[0] + r[0]*dx[0]*(i);
+	    //	    Real y = plo[1] + r[1]*dx[1]*(j);
+	    //	    Real z = plo[2] + r[2]*dx[2]*(k);
+            Real x = r[0]*dx[0]*(i);
+            Real y = r[1]*dx[1]*(j);
+            Real z = r[2]*dx[2]*(k);
             height_arr(i,j,k,0) = x*x / probhi[0] / probhi[0];
             height_arr(i,j,k,1) = y*y / probhi[1] / probhi[1];
             height_arr(i,j,k,2) = z*z / probhi[2] / probhi[2];
@@ -59,6 +62,7 @@ InitParticles ()
             height_arr(i,j,k,1) = yr;
             height_arr(i,j,k,2) = z;
 	});
+	Print()<<FArrayBox(height_arr)<<std::endl;
     }
     
     for(MFIter mfi(a_z_height); mfi.isValid(); ++mfi)
@@ -86,6 +90,7 @@ InitParticles ()
 	    const Real* dx = Geom(lev).CellSize();
 	    const Real* plo = Geom(lev).ProbLo();
     	    RealVect probhi(Geom(lev).ProbHi());
+	    RealVect problo(Geom(lev).ProbLo());
 	    //            std::vector<Gpu::HostVector<ParticleReal> > host_runtime_real(NumRuntimeRealComps());
 	    //            std::vector<Gpu::HostVector<int> > host_runtime_int(NumRuntimeIntComps());
         for (IntVect iv = tile_box.smallEnd(); iv <= tile_box.bigEnd(); tile_box.next(iv)) {
@@ -123,7 +128,7 @@ InitParticles ()
                 p.idata(IntIdx::i) = iv[0];  // particles carry their z-index
                 p.idata(IntIdx::j) = iv[1];  // particles carry their z-index
 		p.idata(IntIdx::k) = iv[2];  // particles carry their z-index
-                amrex::Print()<<p<<" xyz "<<x<<" "<<y<<" "<<z<<" height "<<height_arr(iv[0],iv[1],iv[2],0)<<" "<<height_arr(iv[0],iv[1],iv[2],1)<<" "<<height_arr(iv[0],iv[1],iv[2],2)<<"prob"<<probhi<<std::endl;
+                amrex::Print()<<p<<" xyz "<<x<<" "<<y<<" "<<z<<" height "<<height_arr(iv[0],iv[1],iv[2],0)<<" "<<height_arr(iv[0],iv[1],iv[2],1)<<" "<<height_arr(iv[0],iv[1],iv[2],2)<<"prob "<<probhi<<"prob "<<problo<<std::endl;
 		/*
 		for (int i = NAR; i < NSR; ++i) p.rdata(i) = ParticleReal(p.id());
 		for (int i = NAI; i < NSI; ++i) p.idata(i) = int(p.id());

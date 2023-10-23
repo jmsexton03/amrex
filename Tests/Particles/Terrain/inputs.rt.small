@@ -1,5 +1,5 @@
-redistribute.size = (64, 64, 64)
-redistribute.max_grid_size = 64
+redistribute.size = (4, 4, 4)
+redistribute.max_grid_size = 1024
 redistribute.is_periodic = 1
 redistribute.num_ppc = 1
 redistribute.move_dir = (1, 1, 1)
