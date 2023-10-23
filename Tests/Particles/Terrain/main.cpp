@@ -182,7 +182,7 @@ void testRedistribute ()
     RealBox real_box;
     for (int n = 0; n < BL_SPACEDIM; n++)
     {
-        real_box.setLo(n, 0.0);
+        real_box.setLo(n, -params.size[n]);
         real_box.setHi(n, params.size[n]);
     }
 
