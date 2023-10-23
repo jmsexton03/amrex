@@ -186,7 +186,7 @@ void testRedistribute ()
         real_box.setHi(n, params.size[n]);
     }
 
-    IntVect domain_lo(AMREX_D_DECL(0, 0, 0));
+    IntVect domain_lo(AMREX_D_DECL(-params.size[0]+1,-params.size[1]+1,-params.size[2]+1));
     IntVect domain_hi(AMREX_D_DECL(params.size[0]-1,params.size[1]-1,params.size[2]-1));
     const Box base_domain(domain_lo, domain_hi);
 
@@ -203,7 +203,7 @@ void testRedistribute ()
     IntVect size = params.size;
     for (int lev = 0; lev < params.nlevs; ++lev)
     {
-        ba[lev].define(Box(lo, lo+params.size-1));
+        ba[lev].define(Box(domain_lo, domain_hi));
         ba[lev].maxSize(params.max_grid_size);
         dm[lev].define(ba[lev]);
         lo += size/2;

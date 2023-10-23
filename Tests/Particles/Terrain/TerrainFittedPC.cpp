@@ -33,9 +33,20 @@ InitParticles ()
         {
 	    Real x = plo[0] + r[0]*dx[0]*i;
 	    Real y = plo[1] + r[1]*dx[1]*j;
-            height_arr(i,j,k,0) = 64 - x*x;
-            height_arr(i,j,k,1) = 64 - y*y;
-            height_arr(i,j,k,2) = 8;
+	    Real z = plo[2] + r[2]*dx[2]*k;
+            height_arr(i,j,k,0) = x*x / probhi[0] / probhi[0];
+            height_arr(i,j,k,1) = y*y / probhi[1] / probhi[1];
+            height_arr(i,j,k,2) = z*z / probhi[2] / probhi[2];
+            height_arr(i,j,k,0) = x*x / probhi[0];
+            height_arr(i,j,k,1) = y*y / probhi[1];
+            height_arr(i,j,k,2) = z*z / probhi[2];
+            Real theta = atan(Math::abs(x/y));
+	    Real r = sqrt(x*x+y*y);// / probhi[0] / probhi[1];
+	    Real xhat = r * cos(theta);
+    	    Real yhat = r * sin(theta);
+            height_arr(i,j,k,0) = copysign(xhat,x);
+            height_arr(i,j,k,1) = copysign(yhat,y);
+            height_arr(i,j,k,2) = z;
 	});
     }
     
@@ -61,18 +72,31 @@ InitParticles ()
             Gpu::HostVector<ParticleType> host_particles;
             std::array<Gpu::HostVector<ParticleReal>, NAR> host_real;
             std::array<Gpu::HostVector<int>, NAI> host_int;
-
+	    const Real* dx = Geom(lev).CellSize();
+	    const Real* plo = Geom(lev).ProbLo();
 	    //            std::vector<Gpu::HostVector<ParticleReal> > host_runtime_real(NumRuntimeRealComps());
 	    //            std::vector<Gpu::HostVector<int> > host_runtime_int(NumRuntimeIntComps());
         for (IntVect iv = tile_box.smallEnd(); iv <= tile_box.bigEnd(); tile_box.next(iv)) {
-            if (iv[2] == 3) {
+            if (iv[2] == 3 || true) {
                 Real r[3] = {0.5, 0.5, 0.5};  // this means place at cell center
                 Real v[3] = {0.0, 0.0, 0.0};  // with 0 initial velocity
 
                 Real x = (*height_ptr)(iv) + r[0]*((*height_ptr)(iv + IntVect(AMREX_D_DECL(1, 0, 0))) - (*height_ptr)(iv));
                 Real y = (*height_ptr)(iv) + r[1]*((*height_ptr)(iv + IntVect(AMREX_D_DECL(0, 1, 0))) - (*height_ptr)(iv));
                 Real z = (*height_ptr)(iv) + r[2]*((*height_ptr)(iv + IntVect(AMREX_D_DECL(0, 0, 1))) - (*height_ptr)(iv));
+		/*
+		x = plo[0] + r[0] * height_arr(iv[0],iv[1],iv[2],0);
+		y = plo[1] + r[1] * height_arr(iv[0],iv[1],iv[2],1);
+		z = plo[2] + r[2] * height_arr(iv[0],iv[1],iv[2],2);
 
+		x = height_arr(iv[0],iv[1],iv[2],0);
+		y = height_arr(iv[0],iv[1],iv[2],1);
+		z = height_arr(iv[0],iv[1],iv[2],2);
+
+		x = height_arr(iv[0],iv[1],iv[2],0)*(plo[0]+r[0]*dx[0]*iv[0]);
+		y = height_arr(iv[0],iv[1],iv[2],1)*(plo[1]+r[1]*dx[1]*iv[1]);
+		z = height_arr(iv[0],iv[1],iv[2],2)*(plo[2]+r[2]*dx[2]*iv[2]);
+*/
                 ParticleType p;
                 p.id()  = ParticleType::NextID();
                 p.cpu() = ParallelDescriptor::MyProc();
@@ -87,7 +111,7 @@ InitParticles ()
                 p.idata(IntIdx::i) = iv[0];  // particles carry their z-index
                 p.idata(IntIdx::j) = iv[1];  // particles carry their z-index
 		p.idata(IntIdx::k) = iv[2];  // particles carry their z-index
-		//                amrex::Print()<<p<<" xyz "<<x<<" "<<y<<" "<<z<<" height "<<height_arr(iv[0],iv[1],iv[2],0)<<" "<<height_arr(iv[0],iv[1],iv[2],1)<<" "<<height_arr(iv[0],iv[1],iv[2],2)<<std::endl;
+                amrex::Print()<<p<<" xyz "<<x<<" "<<y<<" "<<z<<" height "<<height_arr(iv[0],iv[1],iv[2],0)<<" "<<height_arr(iv[0],iv[1],iv[2],1)<<" "<<height_arr(iv[0],iv[1],iv[2],2)<<std::endl;
 		/*
 		for (int i = NAR; i < NSR; ++i) p.rdata(i) = ParticleReal(p.id());
 		for (int i = NAI; i < NSI; ++i) p.idata(i) = int(p.id());
