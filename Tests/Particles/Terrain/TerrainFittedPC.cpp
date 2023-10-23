@@ -25,7 +25,7 @@ InitParticles ()
     {
         const Box& tile_box  = mfi.tilebox();
         auto height_arr = a_z_height.array(mfi);
-        Real r[3] = {1.0, 1.0, 1.0};  // this means place at cell center
+        Real r[3] = {0.5, 0.5, 0.5};  // this means place at cell center
         const Real* dx = Geom(lev).CellSize();
         const Real* plo = Geom(lev).ProbLo();
 
@@ -58,11 +58,16 @@ InitParticles ()
 	    //    	    Real r = (.5*(probhi[0]+probhi[1]))*sqrt(x*x/probhi[0]/probhi[0]+y*y/probhi[1]/probhi[1]);
 	    Real xhat = r * cos(theta);
     	    Real yhat = r * sin(theta);*/
-            height_arr(i,j,k,0) = xr;
-            height_arr(i,j,k,1) = yr;
+	    if(xr*xr+yr*yr>r*r) {
+		height_arr(i,j,k,0) = x1;
+		height_arr(i,j,k,1) = y1;
+	    } else {
+		height_arr(i,j,k,0) = xr;
+		height_arr(i,j,k,1) = yr;
+	    }
             height_arr(i,j,k,2) = z;
 	});
-	Print()<<FArrayBox(height_arr)<<std::endl;
+	//	Print()<<FArrayBox(height_arr)<<std::endl;
     }
     
     for(MFIter mfi(a_z_height); mfi.isValid(); ++mfi)
@@ -94,8 +99,8 @@ InitParticles ()
 	    //            std::vector<Gpu::HostVector<ParticleReal> > host_runtime_real(NumRuntimeRealComps());
 	    //            std::vector<Gpu::HostVector<int> > host_runtime_int(NumRuntimeIntComps());
         for (IntVect iv = tile_box.smallEnd(); iv <= tile_box.bigEnd(); tile_box.next(iv)) {
-            if (iv[2] == 3 || true) {
-                Real r[3] = {1.0, 1.0, 1.0};  // this means place at cell center
+            if (iv[2] == 3) {
+                Real r[3] = {0.5, 0.5, 0.5};  // this means place at cell center
                 Real v[3] = {0.0, 0.0, 0.0};  // with 0 initial velocity
 
                 Real x = (*height_ptr)(iv) + r[0]*((*height_ptr)(iv + IntVect(AMREX_D_DECL(1, 0, 0))) - (*height_ptr)(iv));
@@ -128,7 +133,7 @@ InitParticles ()
                 p.idata(IntIdx::i) = iv[0];  // particles carry their z-index
                 p.idata(IntIdx::j) = iv[1];  // particles carry their z-index
 		p.idata(IntIdx::k) = iv[2];  // particles carry their z-index
-                amrex::Print()<<p<<" xyz "<<x<<" "<<y<<" "<<z<<" height "<<height_arr(iv[0],iv[1],iv[2],0)<<" "<<height_arr(iv[0],iv[1],iv[2],1)<<" "<<height_arr(iv[0],iv[1],iv[2],2)<<"prob "<<probhi<<"prob "<<problo<<std::endl;
+		//                amrex::Print()<<p<<" xyz "<<x<<" "<<y<<" "<<z<<" height "<<height_arr(iv[0],iv[1],iv[2],0)<<" "<<height_arr(iv[0],iv[1],iv[2],1)<<" "<<height_arr(iv[0],iv[1],iv[2],2)<<"prob "<<probhi<<"prob "<<problo<<std::endl;
 		/*
 		for (int i = NAR; i < NSR; ++i) p.rdata(i) = ParticleReal(p.id());
 		for (int i = NAI; i < NSI; ++i) p.idata(i) = int(p.id());
