@@ -21,6 +21,7 @@ InitParticles ()
     MultiFab a_z_height(this->amrex::ParticleContainerBase::ParticleBoxArray(0),this->amrex::ParticleContainerBase::ParticleDistributionMap(0),3,0);
     auto domain = this->amrex::ParticleContainerBase::Geom(0).Domain();
     auto probhi = this->amrex::ParticleContainerBase::Geom(0).ProbHi();
+    auto problo = this->amrex::ParticleContainerBase::Geom(0).ProbLo();
     for(MFIter mfi(a_z_height); mfi.isValid(); ++mfi)
     {
         const Box& tile_box  = mfi.tilebox();
@@ -31,9 +32,9 @@ InitParticles ()
 
         amrex::ParallelFor( tile_box, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
         {
-	    Real x = (r[0]+i)*dx[0];
-	    Real y = (r[1]+j)*dx[1];
-	    Real z = (r[2]+k)*dx[2];
+	    Real x = problo[0]+(r[0]+i)*dx[0];
+	    Real y = problo[1]+(r[1]+j)*dx[1];
+	    Real z = problo[2]+(r[2]+k)*dx[2];
 	    /*            Real x = r[0]*dx[0]*(i);
             Real y = r[1]*dx[1]*(j);
             Real z = r[2]*dx[2]*(k);*/
@@ -43,23 +44,23 @@ InitParticles ()
             height_arr(i,j,k,0) = x*x / probhi[0];
             height_arr(i,j,k,1) = y*y / probhi[1];
             height_arr(i,j,k,2) = z*z / probhi[2];
-            Real theta = atan(x/y);
+            Real theta  = atan((x-(probhi[0]-problo[0])*0.5)/(y-(probhi[1]-problo[1])*0.5));
+	    Real thetax = atan((x-(probhi[0]-problo[0])*0.5)/((probhi[1]-problo[1])*0.5));
+	    Real thetay = atan(((probhi[0]-problo[0])*0.5)/(y-(probhi[1]-problo[1])*0.5));
 	    Real xhi=probhi[0];
     	    Real yhi=probhi[1];
     	    Real zhi=probhi[2];
-	    Real r  =0.5*(probhi[0]+probhi[1]);//+probhi[2];
+	    Real r  =0.5*(probhi[0]+probhi[1]-problo[0]-problo[1]);//+probhi[2];
 	    Real x1=sqrt(r*r-y*y);
     	    Real y1=sqrt(r*r-x*x);
 	    Real xr=x*(x1/xhi);
     	    Real yr=y*(y1/yhi);
-	    /*
-    	    Real r = -.05*(probhi[0]+probhi[1]) + sqrt(x*x+y*y) / sqrt(x*x+y*y)-sqrt(probhi[0]*probhi[0]+probhi[1]*probhi[1]);
-	    //	    Real r = sqrt(x*x/probhi[0]/probhi[0]+y*y/probhi[1]/probhi[1])*probhi[0]*probhi[1];
-	    //    	    Real r = (.5*(probhi[0]+probhi[1]))*sqrt(x*x/probhi[0]/probhi[0]+y*y/probhi[1]/probhi[1]);
-	    Real xhat = r * cos(theta);
-    	    Real yhat = r * sin(theta);*/
-	    height_arr(i,j,k,0) = xr;
-	    height_arr(i,j,k,1) = yr;
+	    Real xhat = r * cos(thetay);
+    	    Real yhat = r * sin(thetax);
+            xr=(x-0.5*(probhi[0]-problo[0]))*((probhi[0]-problo[0])*0.5/xhat);
+            yr=(y-0.5*(probhi[1]-problo[1]))*((probhi[1]-problo[1])*0.5/yhat);
+	    height_arr(i,j,k,0) = 0.5*(probhi[0]-problo[0])+xr;
+	    height_arr(i,j,k,1) = 0.5*(probhi[1]-problo[1])+yr;
             height_arr(i,j,k,2) = z;
 	});
 	//	Print()<<FArrayBox(height_arr)<<std::endl;
