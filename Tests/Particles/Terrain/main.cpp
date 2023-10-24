@@ -16,6 +16,8 @@ int num_runtime_int = 0;
 
 bool remove_negative = true;
 
+bool zero_center = false;
+
 void get_position_unit_cell(Real* r, const IntVect& nppc, int i_part)
 {
     int nx = nppc[0];
@@ -33,10 +35,13 @@ void get_position_unit_cell(Real* r, const IntVect& nppc, int i_part)
     int ix_part = i_part/(ny * nz);
     int iy_part = (i_part % (ny * nz)) % ny;
     int iz_part = (i_part % (ny * nz)) / ny;
-
+    if(!zero_center) {
     r[0] = (0.5+ix_part)/nx;
     r[1] = (0.5+iy_part)/ny;
     r[2] = (0.5+iz_part)/nz;
+    } else {
+    Abort("assumptions on problo");
+    }
 }
 /*
     void negateEven ()
@@ -160,6 +165,7 @@ void get_test_params(TestParams& params, const std::string& prefix)
     pp.query("num_runtime_real", num_runtime_real);
     pp.query("num_runtime_int", num_runtime_int);
     pp.query("remove_negative", remove_negative);
+    pp.query("zero_center", zero_center);
 
     params.sort = 0;
     pp.query("sort", params.sort);
@@ -176,17 +182,21 @@ void testRedistribute ()
                                  params.is_periodic)};
 
     Vector<IntVect> rr(params.nlevs-1);
-    for (int lev = 1; lev < params.nlevs; lev++)
+    for (int lev = 1; lev < params.nlevs; lev++) {
         rr[lev-1] = IntVect(AMREX_D_DECL(2,2,2));
+    }
 
     RealBox real_box;
     for (int n = 0; n < BL_SPACEDIM; n++)
     {
-        real_box.setLo(n, -params.size[n]);
+        if(zero_center)
+            real_box.setLo(n, -params.size[n]);
+        else
+            real_box.setLo(n, 0.0);
         real_box.setHi(n, params.size[n]);
     }
 
-    IntVect domain_lo(AMREX_D_DECL(-params.size[0]+1,-params.size[1]+1,-params.size[2]+1));
+    IntVect domain_lo(zero_center ? AMREX_D_DECL(-params.size[0]+1,-params.size[1]+1,-params.size[2]+1): AMREX_D_DECL(0, 0, 0));
     IntVect domain_hi(AMREX_D_DECL(params.size[0]-1,params.size[1]-1,params.size[2]-1));
     const Box base_domain(domain_lo, domain_hi);
 
