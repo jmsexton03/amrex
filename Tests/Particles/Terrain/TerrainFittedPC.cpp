@@ -45,8 +45,8 @@ InitParticles ()
             height_arr(i,j,k,1) = y*y / probhi[1];
             height_arr(i,j,k,2) = z*z / probhi[2];
             Real theta  = atan((x-(probhi[0]-problo[0])*0.5)/(y-(probhi[1]-problo[1])*0.5));
-	    Real thetax = atan((x-(probhi[0]-problo[0])*0.5)/((probhi[1]-problo[1])*0.5));
-	    Real thetay = atan(((probhi[0]-problo[0])*0.5)/(y-(probhi[1]-problo[1])*0.5));
+	    Real thetax = atan((x-(probhi[0]-problo[0])*0.5)/(probhi[1]-(probhi[1]-problo[1])*0.5));
+	    Real thetay = atan((probhi[0]-(probhi[0]-problo[0])*0.5)/(y-(probhi[1]-problo[1])*0.5));
 	    Real xhi=probhi[0];
     	    Real yhi=probhi[1];
     	    Real zhi=probhi[2];
@@ -55,8 +55,8 @@ InitParticles ()
     	    Real y1=sqrt(r*r-x*x);
 	    Real xr=x*(x1/xhi);
     	    Real yr=y*(y1/yhi);
-	    Real xhat = r * cos(thetay);
-    	    Real yhat = r * sin(thetax);
+	    Real xhat = Math::abs(r * cos(theta));
+    	    Real yhat = Math::abs(r * sin(theta));
             xr=(x-0.5*(probhi[0]-problo[0]))*((probhi[0]-problo[0])*0.5/xhat);
             yr=(y-0.5*(probhi[1]-problo[1]))*((probhi[1]-problo[1])*0.5/yhat);
 	    height_arr(i,j,k,0) = 0.5*(probhi[0]-problo[0])+xr;
