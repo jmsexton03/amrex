@@ -23,85 +23,101 @@ InitParticles (MultiFab& a_z_height)
     auto problo = this->amrex::ParticleContainerBase::Geom(0).ProbLo();
     for(MFIter mfi(a_z_height); mfi.isValid(); ++mfi)
     {
-        const Box& tile_box  = mfi.tilebox();
+        const Box& tile_box  = mfi.growntilebox();
         auto height_arr = a_z_height.array(mfi);
-	//        Real r[3] = {0.5, 0.5, 0.5};  // this means place at cell center
+        //        Real r[3] = {0.5, 0.5, 0.5};  // this means place at cell center
         Real r[3] = {0.0, 0.0, 0.0};  // this means place at cell center
         const Real* dx = Geom(lev).CellSize();
         const Real* plo = Geom(lev).ProbLo();
-        const Box tile_box101 = makeSlab(mfi.tilebox(),1,0);
-        const Box tile_box011 = makeSlab(mfi.tilebox(),0,0);
-        amrex::ParallelFor( tile_box101, [=] AMREX_GPU_DEVICE (int i, int , int k) noexcept
+        const Box tile_box101 = makeSlab(mfi.growntilebox(),1,0);
+        const Box tile_box011 = makeSlab(mfi.growntilebox(),0,0);
+        amrex::ParallelFor( tile_box101, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
         {
-	    Real x = problo[0]+(r[0]+i)*dx[0];
-    	    Real cx  =problo[0]+0.5*(probhi[0]-problo[0]);
-       	    Real cy  =problo[1]+0.5*(probhi[1]-problo[1]);
-	    Real xi, xo;
-	    Real r = (cx+cy)/2.0;
-	    if(x<cx)
+            Real x = problo[0]+(r[0]+i)*dx[0];
+            Real cx  =problo[0]+0.5*(probhi[0]-problo[0]);
+            Real cy  =problo[1]+0.5*(probhi[1]-problo[1]);
+            Real xi, xo;
+            Real r = (cx+cy)/2.0;
+            if(x<cx)
                 xi=sqrt(r*r-(cx-x)*(cx-x));
-	    else
+            else
                 xi=sqrt(r*r-(x-cx)*(x-cx));
-	    xo=cy-xi;
-	    //factor 2*xi/(probhi[1]-problo[1]);
-	    height_arr(i,0,k,0)=xo;
-	    //	    Print()<<"("<<i<<","<<0<<","<<k<<") y "<<height_arr(i,0,k,0)<<" "<<xi<<"xo"<<xo<<"cy"<<cx<<std::endl;
-	});
-	amrex::ParallelFor( tile_box011, [=] AMREX_GPU_DEVICE (int , int j, int k) noexcept
+            xo=cy-xi;
+            //factor 2*xi/(probhi[1]-problo[1]);
+            if(i==0)
+            height_arr(i,j,k,0)=xo;
+            //      Print()<<"("<<i<<","<<0<<","<<k<<") y "<<height_arr(i,0,k,0)<<" "<<xi<<"xo"<<xo<<"cy"<<cx<<std::endl;
+        });
+        amrex::ParallelFor( tile_box011, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
         {
-	    Real y = problo[1]+(r[1]+j)*dx[1];
-    	    Real cx  =problo[0]+0.5*(probhi[0]-problo[0]);
-       	    Real cy  =problo[1]+0.5*(probhi[1]-problo[1]);
-	    Real yi, yo;
-    	    Real r = (cx+cy)/2.0;
-	    if(y<cy)
+            Real y = problo[1]+(r[1]+j)*dx[1];
+            Real cx  =problo[0]+0.5*(probhi[0]-problo[0]);
+            Real cy  =problo[1]+0.5*(probhi[1]-problo[1]);
+            Real yi, yo;
+            Real r = (cx+cy)/2.0;
+            if(y<cy)
                 yi=sqrt(r*r-(cy-y)*(cy-y));
-	    else
+            else
                 yi=sqrt(r*r-(y-cy)*(y-cy));
             yo=cx-yi;
-	    height_arr(0,j,k,1)=yo;
-	    //	    Print()<<"("<<0<<","<<j<<","<<k<<") y "<<height_arr(0,j,k,1)<<" "<<yi<<"yo"<<yo<<"cx"<<cx<<std::endl;
-	});
+            if(j==0)
+            height_arr(i,j,k,1)=yo;
+            //      Print()<<"("<<0<<","<<j<<","<<k<<") y "<<height_arr(0,j,k,1)<<" "<<yi<<"yo"<<yo<<"cx"<<cx<<std::endl;
+        });
         amrex::ParallelFor( tile_box, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
         {
-	    Real z = problo[2]+(r[2]+k)*dx[2];
-	    Real cx = problo[0]+0.5*(probhi[0]-problo[0]);
-       	    Real cy = problo[1]+0.5*(probhi[1]-problo[1]);
-	    Real xi = cy-height_arr(i,0,k,0);
-    	    Real yi = cx-height_arr(0,j,k,1);
-	    if(j!=0) {
-        	height_arr(i,j,k,0) = height_arr(i,0,k,0)+2*xi/(probhi[1]-problo[1])*dx[1]*j;
-	    }
-	    if(i!=0) {
-        	height_arr(i,j,k,1) = height_arr(0,j,k,1)+2*yi/(probhi[0]-problo[0])*dx[0]*i;
-	    }
+            Real x = problo[0]+(r[0]+i)*dx[0];
+            Real y = problo[1]+(r[1]+j)*dx[1];
+            Real z = problo[2]+(r[2]+k)*dx[2];
+            Real cx  =problo[0]+0.5*(probhi[0]-problo[0]);
+            Real cy  =problo[1]+0.5*(probhi[1]-problo[1]);
+            Real yi, yo;
+            Real xi, xo;
+            Real r = (cx+cy)/2.0;
+            if(x<cx)
+                xi=sqrt(r*r-(cx-x)*(cx-x));
+            else
+                xi=sqrt(r*r-(x-cx)*(x-cx));
+            xo=cy-xi;
+
+            if(y<cy)
+                yi=sqrt(r*r-(cy-y)*(cy-y));
+            else
+                yi=sqrt(r*r-(y-cy)*(y-cy));
+            yo=cx-yi;
+            if(j!=0) {
+                height_arr(i,j,k,0) = xo+2*xi/(probhi[1]-problo[1])*dx[1]*j;
+            }
+            if(i!=0) {
+                height_arr(i,j,k,1) = yo+2*yi/(probhi[0]-problo[0])*dx[0]*i;
+            }
             height_arr(i,j,k,2) = z;
-	    /*
-	    if(j==0) {
-		Print()<<"("<<i<<","<<j<<","<<k<<") y "<<height_arr(i,j,k,1)<<" "<<yi<<std::endl;
-	    }
-	    if(i==0) {
-		Print()<<"("<<i<<","<<j<<","<<k<<") x "<<height_arr(i,j,k,0)<<" "<<xi<<std::endl;
-		}*/
-	});
-	/*
+            /*
+            if(j==0) {
+                Print()<<"("<<i<<","<<j<<","<<k<<") y "<<height_arr(i,j,k,1)<<" "<<yi<<std::endl;
+            }
+            if(i==0) {
+                Print()<<"("<<i<<","<<j<<","<<k<<") x "<<height_arr(i,j,k,0)<<" "<<xi<<std::endl;
+                }*/
+        });
+        /*
         amrex::ParallelFor( tile_box, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
         {
-	    Real z = problo[2]+(r[2]+k)*dx[2];
-	    Real cx = problo[0]+0.5*(probhi[0]-problo[0]);
-       	    Real cy = problo[1]+0.5*(probhi[1]-problo[1]);
-	    Real xi = cy-height_arr(i,0,k,0);
-    	    Real yi = cx-height_arr(0,j,k,1);
-	    if(j<=1||j>=14) {
-        	height_arr(i,j,k,0) = height_arr(i,j-1,k,0)*NAN;
-	    }
-	    if(i<=1||i>=14) {
-        	height_arr(i,j,k,1) = height_arr(i-1,j,k,1)*NAN;
-	    }
+            Real z = problo[2]+(r[2]+k)*dx[2];
+            Real cx = problo[0]+0.5*(probhi[0]-problo[0]);
+            Real cy = problo[1]+0.5*(probhi[1]-problo[1]);
+            Real xi = cy-height_arr(i,0,k,0);
+            Real yi = cx-height_arr(0,j,k,1);
+            if(j<=1||j>=14) {
+                height_arr(i,j,k,0) = height_arr(i,j-1,k,0)*NAN;
+            }
+            if(i<=1||i>=14) {
+                height_arr(i,j,k,1) = height_arr(i-1,j,k,1)*NAN;
+            }
             height_arr(i,j,k,2) = z;
-	});
+        });
 */
-	//	Print()<<FArrayBox(height_arr)<<std::endl;
+        //      Print()<<FArrayBox(height_arr)<<std::endl;
     }
     
     for(MFIter mfi(a_z_height); mfi.isValid(); ++mfi)
@@ -109,7 +125,7 @@ InitParticles (MultiFab& a_z_height)
         const Box& tile_box  = mfi.tilebox();
         const auto& height = a_z_height[mfi];
         const FArrayBox* height_ptr = nullptr;
-	auto height_arr = a_z_height.array(mfi);
+        auto height_arr = a_z_height.array(mfi);
 #ifdef AMREX_USE_GPU
         std::unique_ptr<FArrayBox> hostfab;
         if (height.arena()->isManaged() || height.arena()->isDevice()) {
@@ -126,12 +142,12 @@ InitParticles (MultiFab& a_z_height)
             Gpu::HostVector<ParticleType> host_particles;
             std::array<Gpu::HostVector<ParticleReal>, NAR> host_real;
             std::array<Gpu::HostVector<int>, NAI> host_int;
-	    const Real* dx = Geom(lev).CellSize();
-	    const Real* plo = Geom(lev).ProbLo();
-    	    RealVect probhi(Geom(lev).ProbHi());
-	    RealVect problo(Geom(lev).ProbLo());
-	    //            std::vector<Gpu::HostVector<ParticleReal> > host_runtime_real(NumRuntimeRealComps());
-	    //            std::vector<Gpu::HostVector<int> > host_runtime_int(NumRuntimeIntComps());
+            const Real* dx = Geom(lev).CellSize();
+            const Real* plo = Geom(lev).ProbLo();
+            RealVect probhi(Geom(lev).ProbHi());
+            RealVect problo(Geom(lev).ProbLo());
+            //            std::vector<Gpu::HostVector<ParticleReal> > host_runtime_real(NumRuntimeRealComps());
+            //            std::vector<Gpu::HostVector<int> > host_runtime_int(NumRuntimeIntComps());
         for (IntVect iv = tile_box.smallEnd(); iv <= tile_box.bigEnd(); tile_box.next(iv)) {
             if (iv[2] == 3) {
                 Real r[3] = {0.5, 0.5, 0.5};  // this means place at cell center
@@ -140,25 +156,25 @@ InitParticles (MultiFab& a_z_height)
                 Real x = (*height_ptr)(iv) + r[0]*((*height_ptr)(iv + IntVect(AMREX_D_DECL(1, 0, 0))) - (*height_ptr)(iv));
                 Real y = (*height_ptr)(iv) + r[1]*((*height_ptr)(iv + IntVect(AMREX_D_DECL(0, 1, 0))) - (*height_ptr)(iv));
                 Real z = (*height_ptr)(iv) + r[2]*((*height_ptr)(iv + IntVect(AMREX_D_DECL(0, 0, 1))) - (*height_ptr)(iv));
-		int test=(probhi[0]-problo[0])/8.0;
-		if(x-2*dx[0]<=problo[0]||y-2*dx[1]<=problo[1]||
-		   x+2*dx[0]>=probhi[0]||y+2*dx[1]>=probhi[1])
-		    continue;
-		if((iv[0]-test)*dx[0]<=problo[0]||(iv[1]-test)*dx[1]<=problo[1]||
-		   (iv[0]+test)*dx[0]>=probhi[0]||(iv[1]+test)*dx[1]>=probhi[1])
-		    continue;
-		/*
-		x = plo[0] + r[0] * height_arr(iv[0],iv[1],iv[2],0);
-		y = plo[1] + r[1] * height_arr(iv[0],iv[1],iv[2],1);
-		z = plo[2] + r[2] * height_arr(iv[0],iv[1],iv[2],2);
+                int test=(probhi[0]-problo[0])/8.0;
+                if(x-2*dx[0]<=problo[0]||y-2*dx[1]<=problo[1]||
+                   x+2*dx[0]>=probhi[0]||y+2*dx[1]>=probhi[1])
+                    continue;
+                if((iv[0]-test)*dx[0]<=problo[0]||(iv[1]-test)*dx[1]<=problo[1]||
+                   (iv[0]+test)*dx[0]>=probhi[0]||(iv[1]+test)*dx[1]>=probhi[1])
+                    continue;
+                /*
+                x = plo[0] + r[0] * height_arr(iv[0],iv[1],iv[2],0);
+                y = plo[1] + r[1] * height_arr(iv[0],iv[1],iv[2],1);
+                z = plo[2] + r[2] * height_arr(iv[0],iv[1],iv[2],2);
 
-		x = height_arr(iv[0],iv[1],iv[2],0);
-		y = height_arr(iv[0],iv[1],iv[2],1);
-		z = height_arr(iv[0],iv[1],iv[2],2);
-		*/
-		x = height_arr(iv[0],iv[1],iv[2],0)+r[0]*(height_arr(iv[0]+1,iv[1],iv[2],0)-height_arr(iv[0],iv[1],iv[2],0));
-		y = height_arr(iv[0],iv[1],iv[2],1)+r[0]*(height_arr(iv[0],iv[1]+1,iv[2],1)-height_arr(iv[0],iv[1],iv[2],1));
-		z = height_arr(iv[0],iv[1],iv[2],2)+r[0]*(height_arr(iv[0],iv[1],iv[2]+1,2)-height_arr(iv[0],iv[1],iv[2],2));
+                x = height_arr(iv[0],iv[1],iv[2],0);
+                y = height_arr(iv[0],iv[1],iv[2],1);
+                z = height_arr(iv[0],iv[1],iv[2],2);
+                */
+                x = height_arr(iv[0],iv[1],iv[2],0)+r[0]*(height_arr(iv[0]+1,iv[1],iv[2],0)-height_arr(iv[0],iv[1],iv[2],0));
+                y = height_arr(iv[0],iv[1],iv[2],1)+r[0]*(height_arr(iv[0],iv[1]+1,iv[2],1)-height_arr(iv[0],iv[1],iv[2],1));
+                z = height_arr(iv[0],iv[1],iv[2],2)+r[0]*(height_arr(iv[0],iv[1],iv[2]+1,2)-height_arr(iv[0],iv[1],iv[2],2));
 
                 ParticleType p;
                 p.id()  = ParticleType::NextID();
@@ -173,23 +189,23 @@ InitParticles (MultiFab& a_z_height)
 
                 p.idata(IntIdx::i) = iv[0];  // particles carry their z-index
                 p.idata(IntIdx::j) = iv[1];  // particles carry their z-index
-		p.idata(IntIdx::k) = iv[2];  // particles carry their z-index
-                amrex::Print()<<p<<" xyz "<<x<<" "<<y<<" "<<z<<" height "<<height_arr(iv[0],iv[1],iv[2],0)<<" "<<height_arr(iv[0],iv[1],iv[2],1)<<" "<<height_arr(iv[0],iv[1],iv[2],2)<<"prob "<<probhi<<"prob "<<problo<<std::endl;
-		/*
-		for (int i = NAR; i < NSR; ++i) p.rdata(i) = ParticleReal(p.id());
-		for (int i = NAI; i < NSI; ++i) p.idata(i) = int(p.id());
-		*/
+                p.idata(IntIdx::k) = iv[2];  // particles carry their z-index
+		//                amrex::Print()<<p<<" xyz "<<x<<" "<<y<<" "<<z<<" height "<<height_arr(iv[0],iv[1],iv[2],0)<<" "<<height_arr(iv[0],iv[1],iv[2],1)<<" "<<height_arr(iv[0],iv[1],iv[2],2)<<"prob "<<probhi<<"prob "<<problo<<std::endl;
+                /*
+                for (int i = NAR; i < NSR; ++i) p.rdata(i) = ParticleReal(p.id());
+                for (int i = NAI; i < NSI; ++i) p.idata(i) = int(p.id());
+                */
                 host_particles.push_back(p);
-		for (int i = 0; i < NAR; ++i)
-		    host_real[i].push_back(p.rdata(i));
+                for (int i = 0; i < NAR; ++i)
+                    host_real[i].push_back(p.rdata(i));
                 for (int i = 0; i < NAI; ++i)
-		    host_int[i].push_back(p.idata(i));
-		/*
-		for (int i = 0; i < NumRuntimeRealComps(); ++i)
-		    host_runtime_real[i].push_back(p.rdata(NAR+i));
-		for (int i = 0; i < NumRuntimeIntComps(); ++i)
-		    host_runtime_int[i].push_back(p.idata(NAI+i)));
-		*/
+                    host_int[i].push_back(p.idata(i));
+                /*
+                for (int i = 0; i < NumRuntimeRealComps(); ++i)
+                    host_runtime_real[i].push_back(p.rdata(NAR+i));
+                for (int i = 0; i < NumRuntimeIntComps(); ++i)
+                    host_runtime_int[i].push_back(p.idata(NAI+i)));
+                */
            }
         }
 
@@ -235,7 +251,7 @@ InitParticles (MultiFab& a_z_height)
                                host_runtime_int[i].end(),
                                soa.GetIntData(NAI+i).begin() + old_size);
             }
-	    */
+            */
             Gpu::streamSynchronize();
     }
     RedistributeLocal();
@@ -335,14 +351,14 @@ TerrainFittedPC::AdvectWithUmac (MultiFab* umac, int lev, Real dt, const MultiFa
 
                     // also update z-coordinate here
                     IntVect iv(
-		       AMREX_D_DECL(p.idata(0),
+                       AMREX_D_DECL(p.idata(0),
                                     p.idata(1),
                                     p.idata(2)));
                     auto xlo = zheight(iv[0], iv[1], iv[2],0);
                     auto xhi = zheight(iv[0]+1, iv[1], iv[2],0);
-		    auto ylo = zheight(iv[0], iv[1], iv[2],1);
+                    auto ylo = zheight(iv[0], iv[1], iv[2],1);
                     auto yhi = zheight(iv[0], iv[1]+1, iv[2],1);
-		    auto zlo = zheight(iv[0], iv[1], iv[2],2);
+                    auto zlo = zheight(iv[0], iv[1], iv[2],2);
                     auto zhi = zheight(iv[0], iv[1], iv[2]+1,2);
                     if (p.pos(0) > xhi) { // need to be careful here
                         p.idata(0) += 1;
