@@ -335,17 +335,29 @@ TerrainFittedPC::AdvectWithUmac (MultiFab* umac, int lev, Real dt, const MultiFa
 
                     // also update z-coordinate here
                     IntVect iv(
-                        AMREX_D_DECL(int(amrex::Math::floor((p.pos(0)-plo[0])*dxi[0])),
-                                     int(amrex::Math::floor((p.pos(1)-plo[1])*dxi[1])),
-                                     p.idata(0)));
-                    iv[0] += domain.smallEnd()[0];
-                    iv[1] += domain.smallEnd()[1];
-                    auto zlo = zheight(iv[0], iv[1], iv[2]);
-                    auto zhi = zheight(iv[0], iv[1], iv[2]+1);
-                    if (p.pos(2) > zhi) { // need to be careful here
+		       AMREX_D_DECL(p.idata(0),
+                                    p.idata(1),
+                                    p.idata(2)));
+                    auto xlo = zheight(iv[0], iv[1], iv[2],0);
+                    auto xhi = zheight(iv[0]+1, iv[1], iv[2],0);
+		    auto ylo = zheight(iv[0], iv[1], iv[2],1);
+                    auto yhi = zheight(iv[0], iv[1]+1, iv[2],1);
+		    auto zlo = zheight(iv[0], iv[1], iv[2],2);
+                    auto zhi = zheight(iv[0], iv[1], iv[2]+1,2);
+                    if (p.pos(0) > xhi) { // need to be careful here
                         p.idata(0) += 1;
-                    } else if (p.pos(2) <= zlo) {
+                    } else if (p.pos(0) <= xlo) {
                         p.idata(0) -= 1;
+                    }
+                    if (p.pos(1) > yhi) { // need to be careful here
+                        p.idata(1) += 1;
+                    } else if (p.pos(1) <= ylo) {
+                        p.idata(1) -= 1;
+                    }
+                    if (p.pos(2) > zhi) { // need to be careful here
+                        p.idata(2) += 1;
+                    } else if (p.pos(2) <= zlo) {
+                        p.idata(2) -= 1;
                     }
                 }
             });
