@@ -11,14 +11,13 @@ static constexpr int NAI = 0;
 
 void
 TerrainFittedPC::
-InitParticles ()
+InitParticles (MultiFab& a_z_height)
 {
     BL_PROFILE("TerrainFittedPC::InitParticles");
 
     const int lev = 0;
     const Real* dx = Geom(lev).CellSize();
     const Real* plo = Geom(lev).ProbLo();
-    MultiFab a_z_height(this->amrex::ParticleContainerBase::ParticleBoxArray(0),this->amrex::ParticleContainerBase::ParticleDistributionMap(0),3,0);
     auto domain = this->amrex::ParticleContainerBase::Geom(0).Domain();
     auto probhi = this->amrex::ParticleContainerBase::Geom(0).ProbHi();
     auto problo = this->amrex::ParticleContainerBase::Geom(0).ProbLo();

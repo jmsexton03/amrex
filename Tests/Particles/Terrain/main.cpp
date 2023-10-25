@@ -225,8 +225,17 @@ void testRedistribute ()
     IntVect nppc(params.num_ppc);
 
     amrex::Print() << "About to initialize particles \n";
+    MultiFab a_z_height(pc.amrex::ParticleContainerBase::ParticleBoxArray(0),pc.amrex::ParticleContainerBase::ParticleDistributionMap(0),3,0);
+    MultiFab umac[3];
+    umac[0].define(pc.amrex::ParticleContainerBase::ParticleBoxArray(0),pc.amrex::ParticleContainerBase::ParticleDistributionMap(0),3,0);
+    umac[1].define(pc.amrex::ParticleContainerBase::ParticleBoxArray(0),pc.amrex::ParticleContainerBase::ParticleDistributionMap(0),3,0);
+    umac[2].define(pc.amrex::ParticleContainerBase::ParticleBoxArray(0),pc.amrex::ParticleContainerBase::ParticleDistributionMap(0),3,0);
+    umac[0].setVal(0.5);
+    umac[1].setVal(1.0);
+    umac[2].setVal(1.0);
 
-    pc.InitParticles();
+    pc.InitParticles(a_z_height);
+    pc.AdvectWithUmac(&umac[0], 0, 1.0, a_z_height);
     /*
     pc.checkAnswer();
 
