@@ -85,6 +85,28 @@ InitParticles ()
 		Print()<<"("<<i<<","<<j<<","<<k<<") x "<<height_arr(i,j,k,0)<<" "<<xi<<std::endl;
 		}*/
 	});
+        amrex::ParallelFor( tile_box, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+        {
+	    Real z = problo[2]+(r[2]+k)*dx[2];
+	    Real cx = problo[0]+0.5*(probhi[0]-problo[0]);
+       	    Real cy = problo[1]+0.5*(probhi[1]-problo[1]);
+	    Real xi = cy-height_arr(i,0,k,0);
+    	    Real yi = cx-height_arr(0,j,k,1);
+	    if(j<=1||j>=14) {
+        	height_arr(i,j,k,0) = height_arr(i,j-1,k,0)*NAN;
+	    }
+	    if(i<=1||i>=14) {
+        	height_arr(i,j,k,1) = height_arr(i-1,j,k,1)*NAN;
+	    }
+            height_arr(i,j,k,2) = z;
+	    /*
+	    if(j==0) {
+		Print()<<"("<<i<<","<<j<<","<<k<<") y "<<height_arr(i,j,k,1)<<" "<<yi<<std::endl;
+	    }
+	    if(i==0) {
+		Print()<<"("<<i<<","<<j<<","<<k<<") x "<<height_arr(i,j,k,0)<<" "<<xi<<std::endl;
+		}*/
+	});
 	//	Print()<<FArrayBox(height_arr)<<std::endl;
     }
     
