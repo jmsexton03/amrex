@@ -30,7 +30,7 @@ InitParticles ()
         Real r[3] = {0.0, 0.0, 0.0};  // this means place at cell center
         const Real* dx = Geom(lev).CellSize();
         const Real* plo = Geom(lev).ProbLo();
-        const Box tile_box101 = makeSlab(mfi.tilebox(),0,1);
+        const Box tile_box101 = makeSlab(mfi.tilebox(),1,0);
         const Box tile_box011 = makeSlab(mfi.tilebox(),0,0);
         amrex::ParallelFor( tile_box101, [=] AMREX_GPU_DEVICE (int i, int , int k) noexcept
         {
@@ -46,6 +46,7 @@ InitParticles ()
 	    xo=cy-xi;
 	    //factor 2*xi/(probhi[1]-problo[1]);
 	    height_arr(i,0,k,0)=xo;
+	    //	    Print()<<"("<<i<<","<<0<<","<<k<<") y "<<height_arr(i,0,k,0)<<" "<<xi<<"xo"<<xo<<"cy"<<cx<<std::endl;
 	});
 	amrex::ParallelFor( tile_box011, [=] AMREX_GPU_DEVICE (int , int j, int k) noexcept
         {
@@ -60,6 +61,7 @@ InitParticles ()
                 yi=sqrt(r*r-(y-cy)*(y-cy));
             yo=cx-yi;
 	    height_arr(0,j,k,1)=yo;
+	    //	    Print()<<"("<<0<<","<<j<<","<<k<<") y "<<height_arr(0,j,k,1)<<" "<<yi<<"yo"<<yo<<"cx"<<cx<<std::endl;
 	});
         amrex::ParallelFor( tile_box, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
         {
@@ -75,6 +77,13 @@ InitParticles ()
         	height_arr(i,j,k,1) = height_arr(0,j,k,1)+2*yi/(probhi[0]-problo[0])*dx[0]*i;
 	    }
             height_arr(i,j,k,2) = z;
+	    /*
+	    if(j==0) {
+		Print()<<"("<<i<<","<<j<<","<<k<<") y "<<height_arr(i,j,k,1)<<" "<<yi<<std::endl;
+	    }
+	    if(i==0) {
+		Print()<<"("<<i<<","<<j<<","<<k<<") x "<<height_arr(i,j,k,0)<<" "<<xi<<std::endl;
+		}*/
 	});
 	//	Print()<<FArrayBox(height_arr)<<std::endl;
     }
