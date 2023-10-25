@@ -140,11 +140,12 @@ InitParticles (MultiFab& a_z_height)
                 Real x = (*height_ptr)(iv) + r[0]*((*height_ptr)(iv + IntVect(AMREX_D_DECL(1, 0, 0))) - (*height_ptr)(iv));
                 Real y = (*height_ptr)(iv) + r[1]*((*height_ptr)(iv + IntVect(AMREX_D_DECL(0, 1, 0))) - (*height_ptr)(iv));
                 Real z = (*height_ptr)(iv) + r[2]*((*height_ptr)(iv + IntVect(AMREX_D_DECL(0, 0, 1))) - (*height_ptr)(iv));
+		int test=(probhi[0]-problo[0])/8.0;
 		if(x-2*dx[0]<=problo[0]||y-2*dx[1]<=problo[1]||
 		   x+2*dx[0]>=probhi[0]||y+2*dx[1]>=probhi[1])
 		    continue;
-		if((iv[0]-2)*dx[0]<=problo[0]||(iv[1]-2)*dx[1]<=problo[1]||
-		   (iv[0]+2)*dx[0]>=probhi[0]||(iv[1]+2)*dx[1]>=probhi[1])
+		if((iv[0]-test)*dx[0]<=problo[0]||(iv[1]-test)*dx[1]<=problo[1]||
+		   (iv[0]+test)*dx[0]>=probhi[0]||(iv[1]+test)*dx[1]>=probhi[1])
 		    continue;
 		/*
 		x = plo[0] + r[0] * height_arr(iv[0],iv[1],iv[2],0);
