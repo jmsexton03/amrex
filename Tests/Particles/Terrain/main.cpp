@@ -235,29 +235,31 @@ void testRedistribute ()
     umac[2].setVal(1.0);
 
     pc.InitParticles(a_z_height);
-    pc.AdvectWithUmac(&umac[0], 0, 1.0, a_z_height);
-    pc.RedistributeLocal(false);
     pc.WritePlotFile("plot", "particles");
     pc.WritePlotFile("plot0", "particles");
     pc.AdvectWithUmac(&umac[0], 0, 1.0, a_z_height);
     pc.RedistributeLocal(false);
+    pc.WritePlotFile("plot", "particles");
     pc.WritePlotFile("plot1", "particles");
     pc.AdvectWithUmac(&umac[0], 0, 1.0, a_z_height);
     pc.RedistributeLocal(false);
     pc.WritePlotFile("plot2", "particles");
-    umac[1].setVal(2.0);
     pc.AdvectWithUmac(&umac[0], 0, 1.0, a_z_height);
     pc.RedistributeLocal(false);
     pc.WritePlotFile("plot3", "particles");
-    pc.AdvectWithUmac(&umac[0], 0, 0.5, a_z_height);
+    umac[1].setVal(2.0);
+    pc.AdvectWithUmac(&umac[0], 0, 1.0, a_z_height);
     pc.RedistributeLocal(false);
     pc.WritePlotFile("plot4", "particles");
-    pc.AdvectWithUmac(&umac[0], 0, -0.5, a_z_height);
+    pc.AdvectWithUmac(&umac[0], 0, 0.5, a_z_height);
     pc.RedistributeLocal(false);
     pc.WritePlotFile("plot5", "particles");
-    pc.AdvectWithUmac(&umac[0], 0, -1.0, a_z_height);
+    pc.AdvectWithUmac(&umac[0], 0, -0.5, a_z_height);
     pc.RedistributeLocal(false);
     pc.WritePlotFile("plot6", "particles");
+    pc.AdvectWithUmac(&umac[0], 0, -1.0, a_z_height);
+    pc.RedistributeLocal(false);
+    pc.WritePlotFile("plot7", "particles");
     umac[1].setVal(10.0);
     pc.AdvectWithUmac(&umac[0], 0, -1.0, a_z_height);
     pc.RedistributeLocal(false);
@@ -265,7 +267,7 @@ void testRedistribute ()
     pc.RedistributeLocal(false);
     pc.AdvectWithUmac(&umac[0], 0, -1.0, a_z_height);
     pc.RedistributeLocal(false);
-    pc.WritePlotFile("plot7", "particles");
+    pc.WritePlotFile("plot8", "particles");
     /*
     pc.checkAnswer();
 
