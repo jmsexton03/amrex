@@ -101,10 +101,25 @@ InitParticles (MultiFab& a_z_height)
                 Print()<<"("<<i<<","<<j<<","<<k<<") x "<<height_arr(i,j,k,0)<<" "<<xi<<std::endl;
                 }*/
             Real theta = x/(probhi[0]-problo[0])*(pi)*2.0-pi;
-            Real radius = y/(probhi[1]-problo[1])*probhi[1]*0.5;
-            height_arr(i,j,k,0)=radius*cos(theta);
+            Real radius = (y/(probhi[1]-problo[1])*probhi[1])*0.25;
+            height_arr(i,j,k,0)=cx+(radius*cos(theta));
             //use probhi[1] as the radius, swap it to something else if needed
-            height_arr(i,j,k,1)=radius*sin(theta);
+            height_arr(i,j,k,1)=cy+(radius*sin(theta));
+            /*
+            if(theta>pi/2.0&&theta<pi) {
+                height_arr(i,j,k,0)-=probhi[0];
+                height_arr(i,j,k,1)-=probhi[1];
+                height_arr(i,j,k,0)=0;
+                height_arr(i,j,k,1)=0;
+            } else if(theta>-pi/2.0&&theta<0) {
+                height_arr(i,j,k,0)-=probhi[0];
+                height_arr(i,j,k,0)=0;
+                height_arr(i,j,k,1)=0;
+            } else if(theta<=-pi/2.0&&false) {
+                height_arr(i,j,k,1)-=probhi[1];
+                height_arr(i,j,k,0)=0;
+                height_arr(i,j,k,1)=0;
+                }*/
         });
         /*
         amrex::ParallelFor( tile_box, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
@@ -198,7 +213,7 @@ InitParticles (MultiFab& a_z_height)
                 p.idata(IntIdx::i) = iv[0];  // particles carry their z-index
                 p.idata(IntIdx::j) = iv[1];  // particles carry their z-index
                 p.idata(IntIdx::k) = iv[2];  // particles carry their z-index
-                //                amrex::Print()<<p<<" xyz "<<x<<" "<<y<<" "<<z<<" height "<<height_arr(iv[0],iv[1],iv[2],0)<<" "<<height_arr(iv[0],iv[1],iv[2],1)<<" "<<height_arr(iv[0],iv[1],iv[2],2)<<"prob "<<probhi<<"prob "<<problo<<std::endl;
+		//                amrex::Print()<<p<<" xyz "<<x<<" "<<y<<" "<<z<<" height "<<height_arr(iv[0],iv[1],iv[2],0)<<" "<<height_arr(iv[0],iv[1],iv[2],1)<<" "<<height_arr(iv[0],iv[1],iv[2],2)<<"prob "<<probhi<<"prob "<<problo<<std::endl;
                 /*
                 for (int i = NAR; i < NSR; ++i) p.rdata(i) = ParticleReal(p.id());
                 for (int i = NAI; i < NSI; ++i) p.idata(i) = int(p.id());
