@@ -101,7 +101,7 @@ InitParticles (MultiFab& a_z_height)
                 Print()<<"("<<i<<","<<j<<","<<k<<") x "<<height_arr(i,j,k,0)<<" "<<xi<<std::endl;
                 }*/
             Real theta = x/(probhi[0]-problo[0])*(pi)*2.0-pi;
-            Real radius = (y/(probhi[1]-problo[1])*probhi[1])*0.25;
+            Real radius = .25*cx+(y/(probhi[1]-problo[1]-.25*cx)*probhi[1])*0.25;
             height_arr(i,j,k,0)=cx+(radius*cos(theta));
             //use probhi[1] as the radius, swap it to something else if needed
             height_arr(i,j,k,1)=cy+(radius*sin(theta));
