@@ -226,6 +226,7 @@ void testRedistribute ()
 
     amrex::Print() << "About to initialize particles \n";
     MultiFab a_z_height(pc.amrex::ParticleContainerBase::ParticleBoxArray(0),pc.amrex::ParticleContainerBase::ParticleDistributionMap(0),3,0);
+    pc.InitHeight(a_z_height);
     MultiFab umac[3];
     umac[0].define(pc.amrex::ParticleContainerBase::ParticleBoxArray(0),pc.amrex::ParticleContainerBase::ParticleDistributionMap(0),3,0);
     umac[1].define(pc.amrex::ParticleContainerBase::ParticleBoxArray(0),pc.amrex::ParticleContainerBase::ParticleDistributionMap(0),3,0);
@@ -233,7 +234,7 @@ void testRedistribute ()
     umac[0].setVal(0.5);
     umac[1].setVal(10.0);
     umac[2].setVal(1.0);
-
+    pc.InitUmac(&umac[0], 0, 1.0, a_z_height);
     pc.InitParticles(a_z_height);
     pc.WritePlotFile("plot", "particles");
     pc.WritePlotFile("plot0", "particles");

@@ -9,11 +9,12 @@ static constexpr int NSI = 3;
 static constexpr int NAR = 0;
 static constexpr int NAI = 0;
 
+
 void
 TerrainFittedPC::
-InitParticles (MultiFab& a_z_height)
+InitHeight (MultiFab& a_z_height)
 {
-    BL_PROFILE("TerrainFittedPC::InitParticles");
+    BL_PROFILE("TerrainFittedPC::InitHeight");
 
     const int lev = 0;
     const Real* dx = Geom(lev).CellSize();
@@ -140,7 +141,76 @@ InitParticles (MultiFab& a_z_height)
 */
         //      Print()<<FArrayBox(height_arr)<<std::endl;
     }
-    
+}
+void
+TerrainFittedPC::InitUmac (MultiFab* umac, int lev, Real dt, const MultiFab& a_z_height)
+{
+    BL_PROFILE("TerrainFittedPC::InitUmac");
+
+    const Real* dx = Geom(lev).CellSize();
+    const Real* plo = Geom(lev).ProbLo();
+    auto domain = this->amrex::ParticleContainerBase::Geom(0).Domain();
+    auto probhi = this->amrex::ParticleContainerBase::Geom(0).ProbHi();
+    auto problo = this->amrex::ParticleContainerBase::Geom(0).ProbLo();
+    Vector<std::unique_ptr<MultiFab> > raii_umac(AMREX_SPACEDIM);
+    Vector<MultiFab*> umac_pointer(AMREX_SPACEDIM);
+    if (OnSameGrids(lev, umac[0]))
+    {
+        for (int i = 0; i < AMREX_SPACEDIM; i++) {
+            umac_pointer[i] = &umac[i];
+        }
+    }
+    else
+    {
+        for (int i = 0; i < AMREX_SPACEDIM; i++)
+        {
+            int ng = umac[i].nGrow();
+            raii_umac[i] = std::make_unique<MultiFab>
+                (amrex::convert(m_gdb->ParticleBoxArray(lev), IntVect::TheDimensionVector(i)),
+                 m_gdb->ParticleDistributionMap(lev), umac[i].nComp(), ng);
+            umac_pointer[i] = raii_umac[i].get();
+            umac_pointer[i]->ParallelCopy(umac[i],0,0,umac[i].nComp(),ng,ng);
+        }
+    }
+    for(MFIter mfi(a_z_height); mfi.isValid(); ++mfi)
+    {
+        const Box& tile_box  = mfi.growntilebox();
+        auto height_arr = a_z_height.array(mfi);
+        auto umac_x_arr = umac[0].array(mfi);
+        auto umac_y_arr = umac[1].array(mfi);
+        auto umac_z_arr = umac[2].array(mfi);   
+        //        Real r[3] = {0.5, 0.5, 0.5};  // this means place at cell center
+        Real r[3] = {0.0, 0.0, 0.0};  // this means place at cell center
+        const Real* dx = Geom(lev).CellSize();
+        const Real* plo = Geom(lev).ProbLo();
+        const Box tile_box101 = makeSlab(mfi.growntilebox(),1,0);
+        const Box tile_box011 = makeSlab(mfi.growntilebox(),0,0);
+        const Real pi=amrex::Math::pi<Real>();
+        amrex::ParallelFor( tile_box, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+        {
+            Real x = problo[0]+(r[0]+i)*dx[0];
+            Real y = problo[1]+(r[1]+j)*dx[1];
+            Real z = problo[2]+(r[2]+k)*dx[2];
+            umac_x_arr(i,j,k,0)=-y;
+            umac_y_arr(i,j,k,0)=x;
+            umac_z_arr(i,j,k,0)=0;
+        });
+    }
+}
+
+void
+TerrainFittedPC::
+InitParticles (MultiFab& a_z_height)
+{
+    BL_PROFILE("TerrainFittedPC::InitParticles");
+
+    const int lev = 0;
+    const Real* dx = Geom(lev).CellSize();
+    const Real* plo = Geom(lev).ProbLo();
+    auto domain = this->amrex::ParticleContainerBase::Geom(0).Domain();
+    auto probhi = this->amrex::ParticleContainerBase::Geom(0).ProbHi();
+    auto problo = this->amrex::ParticleContainerBase::Geom(0).ProbLo();
+
     for(MFIter mfi(a_z_height); mfi.isValid(); ++mfi)
     {
         const Box& tile_box  = mfi.tilebox();
@@ -213,7 +283,7 @@ InitParticles (MultiFab& a_z_height)
                 p.idata(IntIdx::i) = iv[0];  // particles carry their z-index
                 p.idata(IntIdx::j) = iv[1];  // particles carry their z-index
                 p.idata(IntIdx::k) = iv[2];  // particles carry their z-index
-		//                amrex::Print()<<p<<" xyz "<<x<<" "<<y<<" "<<z<<" height "<<height_arr(iv[0],iv[1],iv[2],0)<<" "<<height_arr(iv[0],iv[1],iv[2],1)<<" "<<height_arr(iv[0],iv[1],iv[2],2)<<"prob "<<probhi<<"prob "<<problo<<std::endl;
+                //                amrex::Print()<<p<<" xyz "<<x<<" "<<y<<" "<<z<<" height "<<height_arr(iv[0],iv[1],iv[2],0)<<" "<<height_arr(iv[0],iv[1],iv[2],1)<<" "<<height_arr(iv[0],iv[1],iv[2],2)<<"prob "<<probhi<<"prob "<<problo<<std::endl;
                 /*
                 for (int i = NAR; i < NSR; ++i) p.rdata(i) = ParticleReal(p.id());
                 for (int i = NAI; i < NSI; ++i) p.idata(i) = int(p.id());
