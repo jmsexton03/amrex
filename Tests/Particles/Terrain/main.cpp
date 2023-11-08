@@ -231,43 +231,41 @@ void testRedistribute ()
     umac[0].define(pc.amrex::ParticleContainerBase::ParticleBoxArray(0),pc.amrex::ParticleContainerBase::ParticleDistributionMap(0),3,0);
     umac[1].define(pc.amrex::ParticleContainerBase::ParticleBoxArray(0),pc.amrex::ParticleContainerBase::ParticleDistributionMap(0),3,0);
     umac[2].define(pc.amrex::ParticleContainerBase::ParticleBoxArray(0),pc.amrex::ParticleContainerBase::ParticleDistributionMap(0),3,0);
-    umac[0].setVal(0.5);
-    umac[1].setVal(10.0);
-    umac[2].setVal(1.0);
+    umac[0].setVal(0.0);
+    umac[1].setVal(0.0);
+    umac[2].setVal(0.0);
     pc.InitUmac(&umac[0], 0, 1.0, a_z_height);
     pc.InitParticles(a_z_height);
     pc.WritePlotFile("plot", "particles");
     pc.WritePlotFile("plot0", "particles");
     pc.AdvectWithUmac(&umac[0], 0, 1.0, a_z_height);
-    pc.RedistributeLocal(false);
+
     pc.WritePlotFile("plot", "particles");
     pc.WritePlotFile("plot1", "particles");
     pc.AdvectWithUmac(&umac[0], 0, 1.0, a_z_height);
-    pc.RedistributeLocal(false);
+
     pc.WritePlotFile("plot2", "particles");
     pc.AdvectWithUmac(&umac[0], 0, 1.0, a_z_height);
-    pc.RedistributeLocal(false);
+
     pc.WritePlotFile("plot3", "particles");
-    umac[1].setVal(2.0);
     pc.AdvectWithUmac(&umac[0], 0, 1.0, a_z_height);
-    pc.RedistributeLocal(false);
+
     pc.WritePlotFile("plot4", "particles");
     pc.AdvectWithUmac(&umac[0], 0, 0.5, a_z_height);
-    pc.RedistributeLocal(false);
+
     pc.WritePlotFile("plot5", "particles");
     pc.AdvectWithUmac(&umac[0], 0, -0.5, a_z_height);
-    pc.RedistributeLocal(false);
+
     pc.WritePlotFile("plot6", "particles");
     pc.AdvectWithUmac(&umac[0], 0, -1.0, a_z_height);
-    pc.RedistributeLocal(false);
+
     pc.WritePlotFile("plot7", "particles");
-    umac[1].setVal(10.0);
     pc.AdvectWithUmac(&umac[0], 0, -1.0, a_z_height);
-    pc.RedistributeLocal(false);
+
     pc.AdvectWithUmac(&umac[0], 0, -1.0, a_z_height);
-    pc.RedistributeLocal(false);
+
     pc.AdvectWithUmac(&umac[0], 0, -1.0, a_z_height);
-    pc.RedistributeLocal(false);
+
     pc.WritePlotFile("plot8", "particles");
     /*
     pc.checkAnswer();

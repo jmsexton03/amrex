@@ -186,13 +186,16 @@ TerrainFittedPC::InitUmac (MultiFab* umac, int lev, Real dt, const MultiFab& a_z
         const Box tile_box101 = makeSlab(mfi.growntilebox(),1,0);
         const Box tile_box011 = makeSlab(mfi.growntilebox(),0,0);
         const Real pi=amrex::Math::pi<Real>();
+        Real cx  =problo[0]+0.5*(probhi[0]-problo[0]);
+        Real cy  =problo[1]+0.5*(probhi[1]-problo[1]);
         amrex::ParallelFor( tile_box, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
         {
             Real x = problo[0]+(r[0]+i)*dx[0];
             Real y = problo[1]+(r[1]+j)*dx[1];
             Real z = problo[2]+(r[2]+k)*dx[2];
-            umac_x_arr(i,j,k,0)=-y;
-            umac_y_arr(i,j,k,0)=x;
+            Real theta=atan((y-cy)/(x-cx));
+            umac_x_arr(i,j,k,0)=cos(theta);//probhi[1];
+            umac_y_arr(i,j,k,0)=sin(theta);//probhi[0];
             umac_z_arr(i,j,k,0)=0;
         });
     }
