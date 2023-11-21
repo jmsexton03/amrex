@@ -16,9 +16,9 @@ InitHeight (MultiFab& a_z_height)
 {
     BL_PROFILE("TerrainFittedPC::InitHeight");
 
+    //This should pass in the level to be initialized
     const int lev = 0;
-    const Real* dx = Geom(lev).CellSize();
-    const Real* plo = Geom(lev).ProbLo();
+    const auto dx = Geom(lev).CellSizeArray();
     auto domain = this->amrex::ParticleContainerBase::Geom(0).Domain();
     auto probhi = this->amrex::ParticleContainerBase::Geom(0).ProbHi();
     auto problo = this->amrex::ParticleContainerBase::Geom(0).ProbLo();
@@ -28,42 +28,9 @@ InitHeight (MultiFab& a_z_height)
         auto height_arr = a_z_height.array(mfi);
         //        Real r[3] = {0.5, 0.5, 0.5};  // this means place at cell center
         Real r[3] = {0.0, 0.0, 0.0};  // this means place at cell center
-        const Real* dx = Geom(lev).CellSize();
-        const Real* plo = Geom(lev).ProbLo();
-        const Box tile_box101 = makeSlab(mfi.growntilebox(),1,0);
-        const Box tile_box011 = makeSlab(mfi.growntilebox(),0,0);
+
         const Real pi=amrex::Math::pi<Real>();
-        amrex::ParallelFor( tile_box101, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        {
-            Real x = problo[0]+(r[0]+i)*dx[0];
-            Real cx  =problo[0]+0.5*(probhi[0]-problo[0]);
-            Real cy  =problo[1]+0.5*(probhi[1]-problo[1]);
-            Real xi, xo;
-            Real r = (cx+cy)/2.0;
-            if(x<cx)
-                xi=sqrt(r*r-(cx-x)*(cx-x));
-            else
-                xi=sqrt(r*r-(x-cx)*(x-cx));
-            xo=cy-xi;
-            //factor 2*xi/(probhi[1]-problo[1]);
-            if(i==0)
-            height_arr(i,j,k,0)=xo;
-        });
-        amrex::ParallelFor( tile_box011, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        {
-            Real y = problo[1]+(r[1]+j)*dx[1];
-            Real cx  =problo[0]+0.5*(probhi[0]-problo[0]);
-            Real cy  =problo[1]+0.5*(probhi[1]-problo[1]);
-            Real yi, yo;
-            Real r = (cx+cy)/2.0;
-            if(y<cy)
-                yi=sqrt(r*r-(cy-y)*(cy-y));
-            else
-                yi=sqrt(r*r-(y-cy)*(y-cy));
-            yo=cx-yi;
-            if(j==0)
-            height_arr(i,j,k,1)=yo;
-        });
+
         amrex::ParallelFor( tile_box, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
         {
             Real x = problo[0]+(r[0]+i)*dx[0];
@@ -96,7 +63,6 @@ InitHeight (MultiFab& a_z_height)
             Real theta = x/(probhi[0]-problo[0])*(pi)*2.0-pi;
             Real radius = .25*cx+(y/(probhi[1]-problo[1]-.25*cx)*probhi[1])*0.25;
             height_arr(i,j,k,0)=cx+(radius*cos(theta));
-            //use probhi[1] as the radius, swap it to something else if needed
             height_arr(i,j,k,1)=cy+(radius*sin(theta));
         });
     }
@@ -106,8 +72,8 @@ TerrainFittedPC::InitUmac (MultiFab* umac, int lev, Real dt, const MultiFab& a_z
 {
     BL_PROFILE("TerrainFittedPC::InitUmac");
 
-    const Real* dx = Geom(lev).CellSize();
-    const Real* plo = Geom(lev).ProbLo();
+    const auto dx = Geom(lev).CellSizeArray();
+
     auto domain = this->amrex::ParticleContainerBase::Geom(0).Domain();
     auto probhi = this->amrex::ParticleContainerBase::Geom(0).ProbHi();
     auto problo = this->amrex::ParticleContainerBase::Geom(0).ProbLo();
@@ -140,10 +106,6 @@ TerrainFittedPC::InitUmac (MultiFab* umac, int lev, Real dt, const MultiFab& a_z
         auto umac_z_arr = umac[2].array(mfi);   
         //        Real r[3] = {0.5, 0.5, 0.5};  // this means place at cell center
         Real r[3] = {0.0, 0.0, 0.0};  // this means place at cell center
-        const Real* dx = Geom(lev).CellSize();
-        const Real* plo = Geom(lev).ProbLo();
-        const Box tile_box101 = makeSlab(mfi.growntilebox(),1,0);
-        const Box tile_box011 = makeSlab(mfi.growntilebox(),0,0);
         const Real pi=amrex::Math::pi<Real>();
         Real cx  =problo[0]+0.5*(probhi[0]-problo[0]);
         Real cy  =problo[1]+0.5*(probhi[1]-problo[1]);
@@ -153,8 +115,8 @@ TerrainFittedPC::InitUmac (MultiFab* umac, int lev, Real dt, const MultiFab& a_z
             Real y = problo[1]+(r[1]+j)*dx[1];
             Real z = problo[2]+(r[2]+k)*dx[2];
             Real theta=atan((y-cy)/(x-cx));
-            umac_x_arr(i,j,k,0)=0;
-            umac_y_arr(i,j,k,0)=0;
+            umac_x_arr(i,j,k,0)=cos(theta);
+            umac_y_arr(i,j,k,0)=sin(theta);
             umac_z_arr(i,j,k,0)=0;
         });
     }
@@ -167,8 +129,7 @@ InitParticles (MultiFab& a_z_height)
     BL_PROFILE("TerrainFittedPC::InitParticles");
 
     const int lev = 0;
-    const Real* dx = Geom(lev).CellSize();
-    const Real* plo = Geom(lev).ProbLo();
+    const auto dx = Geom(lev).CellSizeArray();
     auto domain = this->amrex::ParticleContainerBase::Geom(0).Domain();
     auto probhi = this->amrex::ParticleContainerBase::Geom(0).ProbHi();
     auto problo = this->amrex::ParticleContainerBase::Geom(0).ProbLo();
@@ -195,8 +156,7 @@ InitParticles (MultiFab& a_z_height)
             Gpu::HostVector<ParticleType> host_particles;
             std::array<Gpu::HostVector<ParticleReal>, NAR> host_real;
             std::array<Gpu::HostVector<int>, NAI> host_int;
-            const Real* dx = Geom(lev).CellSize();
-            const Real* plo = Geom(lev).ProbLo();
+
             RealVect probhi(Geom(lev).ProbHi());
             RealVect problo(Geom(lev).ProbLo());
 
