@@ -214,8 +214,8 @@ C$(AMREX_BASE)_sources += AMReX_NonLocalBC.cpp
 #
 # Plotfile
 #
-C$(AMREX_BASE)_sources += AMReX_PlotFileUtil.cpp AMReX_PlotFileDataImpl.cpp
-C$(AMREX_BASE)_headers += AMReX_PlotFileUtil.H AMReX_PlotFileDataImpl.H
+C$(AMREX_BASE)_sources += AMReX_PlotFileUtil.cpp AMReX_PlotFileDataImpl.cpp AMReX_JobInfoFileUtil.cpp
+C$(AMREX_BASE)_headers += AMReX_PlotFileUtil.H AMReX_PlotFileDataImpl.H AMReX_JobInfoFileUtil.H
 
 #
 # Time Integration

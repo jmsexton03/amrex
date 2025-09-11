@@ -199,6 +199,8 @@ foreach(D IN LISTS AMReX_SPACEDIM)
        AMReX_PlotFileUtil.H
        AMReX_PlotFileDataImpl.H
        AMReX_PlotFileDataImpl.cpp
+       AMReX_JobInfoFileUtil.cpp
+       AMReX_JobInfoFileUtil.H
        # Time Integration
        AMReX_FEIntegrator.H
        AMReX_IntegratorBase.H
