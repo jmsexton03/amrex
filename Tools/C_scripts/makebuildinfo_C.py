@@ -154,12 +154,33 @@ const char* buildInfoGetGitHash(int i) {
   }
 }
 
+const char* buildInfoGetGitRepoName(int i) {
+
+  //static const char REPO1[] = "${GITREPO[1]}";
+  @@GITREPO_DECLS@@
+  static const char EMPT[] = "";
+
+  switch(i)
+  {
+    @@GITREPO_CASE@@
+    default: return EMPT;
+  }
+}
+
 const char* buildInfoGetBuildGitHash() {
 
   //static const char HASH[] = "${GIT}";
   @@BUILDGIT_DECLS@@
 
   return HASH;
+}
+
+const char* buildInfoGetBuildGitRepoName() {
+
+  //static const char REPO[] = "${GITREPO}";
+  @@BUILDGIT_REPO@@
+
+  return REPO;
 }
 
 const char* buildInfoGetBuildGitName() {
@@ -195,6 +216,25 @@ def get_git_hash(d, git_style):
         ghash = ""
     os.chdir(cwd)
     return ghash
+
+def get_git_repo_name(d):
+    cwd = os.getcwd()
+    os.chdir(d)
+    try:
+        remote_url = runcommand("git config --get remote.origin.url")
+        if remote_url:
+            if remote_url.endswith(".git"):
+                remote_url = remote_url[:-4]
+            if "/" in remote_url:
+                repo_name = remote_url.split("/")[-1]
+            else:
+                repo_name = remote_url
+        else:
+            repo_name = ""
+    except:
+        repo_name = ""
+    os.chdir(cwd)
+    return repo_name
 
 
 if __name__ == "__main__":
@@ -286,22 +326,28 @@ if __name__ == "__main__":
         GIT = args.GIT.split()
 
     git_hashes = []
+    git_repo_names = []
     for d in GIT:
         if d and os.path.isdir(d):
             git_hashes.append(get_git_hash(d, args.GIT_STYLE))
+            git_repo_names.append(get_git_repo_name(d))
         else:
             git_hashes.append("")
+            git_repo_names.append("")
 
     if args.build_git_dir != "":
         try:
             os.chdir(args.build_git_dir)
         except:
             build_git_hash = "directory not valid"
+            build_git_repo_name = ""
         else:
             build_git_hash = get_git_hash(args.build_git_dir, args.GIT_STYLE)
+            build_git_repo_name = get_git_repo_name(args.build_git_dir)
             os.chdir(running_dir)
     else:
         build_git_hash = ""
+        build_git_repo_name = ""
 
 
     # modules
@@ -435,10 +481,34 @@ if __name__ == "__main__":
 
                 fout.write(git_str)
 
+            elif keyword == "GITREPO_DECLS":
+                indent = index
+                git_str = ""
+                for i, gr in enumerate(git_repo_names):
+                    git_str += '{}static const char REPO{:1d}[] = "{}";\n'.format(
+                        indent*" ", i+1, gr)
+
+                fout.write(git_str)
+
+            elif keyword == "GITREPO_CASE":
+                indent = index
+                git_str = ""
+                for i in range(len(git_repo_names)):
+                    git_str += '{}case {:1d}: return REPO{:1d};\n'.format(
+                        indent*" ", i+1, i+1)
+
+                fout.write(git_str)
+
             elif keyword == "BUILDGIT_DECLS":
                 indent = index
                 git_str = '{}static const char HASH[] = "{}";\n'.format(
                     indent*" ", build_git_hash)
+                fout.write(git_str)
+
+            elif keyword == "BUILDGIT_REPO":
+                indent = index
+                git_str = '{}static const char REPO[] = "{}";\n'.format(
+                    indent*" ", build_git_repo_name)
                 fout.write(git_str)
 
             elif keyword == "BUILDGIT_NAME":

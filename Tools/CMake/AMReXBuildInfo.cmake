@@ -73,6 +73,39 @@ set(AMREX_BUILD_DATETIME "" CACHE STRING
    "User defined build date and time. Set ONLY for reproducibly built binary distributions")
 
 #
+# FUNCTION: get_git_repo_name(_git_dir _output_var)
+#
+# Extracts the repository name from the git remote origin URL.
+#
+function(get_git_repo_name _git_dir _output_var)
+   find_package(Git)
+   if (Git_FOUND AND EXISTS ${_git_dir}/.git)
+      execute_process(
+         COMMAND git config --get remote.origin.url
+         WORKING_DIRECTORY ${_git_dir}
+         OUTPUT_VARIABLE _remote_url
+         RESULT_VARIABLE _git_result)
+      
+      if (_git_result EQUAL 0)
+         string(STRIP "${_remote_url}" _remote_url)
+         if (_remote_url)
+            # Remove .git extension if present
+            string(REGEX REPLACE "\\.git$" "" _remote_url "${_remote_url}")
+            # Extract repository name (last part after /)
+            string(REGEX REPLACE ".*/([^/]+)$" "\\1" _repo_name "${_remote_url}")
+            set(${_output_var} "${_repo_name}" PARENT_SCOPE)
+         else()
+            set(${_output_var} "" PARENT_SCOPE)
+         endif()
+      else()
+         set(${_output_var} "" PARENT_SCOPE)
+      endif()
+   else()
+      set(${_output_var} "" PARENT_SCOPE)
+   endif()
+endfunction()
+
+#
 # FUNCTION: generate_buildinfo(_target _git_dir)
 #
 # Adds  AMReXBuildInfo.H and AMReXBuildInfo.cpp to the source
@@ -174,7 +207,7 @@ function (generate_buildinfo _target _git_dir)
    #
    find_package(Git)
 
-   # App code hash
+   # App code hash and repo name
    if (Git_FOUND AND (EXISTS ${_git_dir}/.git))
       # Check the hash of the app code first
       execute_process(
@@ -184,15 +217,24 @@ function (generate_buildinfo _target _git_dir)
       string(STRIP "${_hash}" _hash)
       set(GIT_DECLS "static const char HASH1[] = \"${_hash}\";\n")
       set(GIT_CASE  "case 1: return HASH1;\n")
+      
+      # Get repository name for app code
+      get_git_repo_name(${_git_dir} _repo_name)
+      set(GITREPO_DECLS "static const char REPO1[] = \"${_repo_name}\";\n")
+      set(GITREPO_CASE  "case 1: return REPO1;\n")
    endif ()
 
    # AMReX app code
    if (AMReX_GIT_VERSION)  # If using AMReX as a library
       set(GIT_DECLS "${GIT_DECLS}  static const char HASH2[] = ${AMReX_GIT_VERSION};")
       set(GIT_CASE  "${GIT_CASE}    case 2: return HASH2;")
+      set(GITREPO_DECLS "${GITREPO_DECLS}  static const char REPO2[] = \"amrex\";")
+      set(GITREPO_CASE  "${GITREPO_CASE}    case 2: return REPO2;")
    elseif (AMREX_GIT_VERSION)  # If using AMReX via add_subdirectory()
       set(GIT_DECLS "${GIT_DECLS}  static const char HASH2[] = \"${AMREX_GIT_VERSION}\";")
       set(GIT_CASE  "${GIT_CASE}    case 2: return HASH2;")
+      set(GITREPO_DECLS "${GITREPO_DECLS}  static const char REPO2[] = \"amrex\";")
+      set(GITREPO_CASE  "${GITREPO_CASE}    case 2: return REPO2;")
    elseif ( Git_FOUND AND (EXISTS ${AMREX_TOP_DIR}/.git) )   # Backup case
       execute_process(
          COMMAND git describe --abbrev=12 --dirty --always --tags
@@ -201,11 +243,20 @@ function (generate_buildinfo _target _git_dir)
       string(STRIP "${_hash}" _hash)
       set(GIT_DECLS "${GIT_DECLS}  static const char HASH2[] = \"${_hash}\";")
       set(GIT_CASE  "${GIT_CASE}    case 2: return HASH2;")
+      
+      # Get repository name for AMReX
+      get_git_repo_name(${AMREX_TOP_DIR} _amrex_repo_name)
+      set(GITREPO_DECLS "${GITREPO_DECLS}  static const char REPO2[] = \"${_amrex_repo_name}\";")
+      set(GITREPO_CASE  "${GITREPO_CASE}    case 2: return REPO2;")
    endif ()
 
    # Other variables to be left unfilled for now
    set(BUILDGIT_DECLS "static const char HASH[] = \"\";")
    set(BUILDGIT_NAME  "static const char NAME[] = \"\";")
+   
+   # Get build directory repository name if it's a git repository
+   get_git_repo_name(${BUILD_DIR} _build_repo_name)
+   set(BUILDGIT_REPO  "static const char REPO[] = \"${_build_repo_name}\";")
 
    # Generate AMReX_buildInfo.cpp
    configure_file( ${AMREX_BUILDINFO_IFILE}

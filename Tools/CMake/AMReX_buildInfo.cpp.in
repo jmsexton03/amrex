@@ -144,12 +144,33 @@ const char* buildInfoGetGitHash(int i) {
   }
 }
 
+const char* buildInfoGetGitRepoName(int i) {
+
+  //static const char REPO1[] = "${GITREPO[1]}";
+  @GITREPO_DECLS@
+  static const char EMPT[] = "";
+
+  switch(i)
+  {
+    @GITREPO_CASE@
+    default: return EMPT;
+  }
+}
+
 const char* buildInfoGetBuildGitHash() {
 
   //static const char HASH[] = "${GIT}";
   @BUILDGIT_DECLS@
 
   return HASH;
+}
+
+const char* buildInfoGetBuildGitRepoName() {
+
+  //static const char REPO[] = "${GITREPO}";
+  @BUILDGIT_REPO@
+
+  return REPO;
 }
 
 const char* buildInfoGetBuildGitName() {

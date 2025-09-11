@@ -27,10 +27,12 @@ const char* buildInfoGetModuleName(int i);
 const char* buildInfoGetModuleVal(int i);
 const char* buildInfoGetDif(int i);
 const char* buildInfoGetGitHash(int i);
+const char* buildInfoGetGitRepoName(int i);
 const char* buildInfoGetGitBranch(int i);
 const char* buildInfoGetLinkerInfo(int i);
 const char* buildInfoGetBuildGitName();
 const char* buildInfoGetBuildGitHash();
+const char* buildInfoGetBuildGitRepoName();
 #ifdef AMREX_USE_CUDA
 const char* buildInfoGetCUDAVersion();
 #endif
